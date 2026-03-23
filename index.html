@@ -692,6 +692,7 @@ const translations = {
     iso: 'ISO',
     shutter: 'Enstantane',
     aperture: 'Diyafram',
+    focalLength: 'Odak Uzaklığı',
     settings: 'Ayarlar',
     crop: 'Kırpma (Aspect Ratio)',
     original: 'Orijinal',
@@ -730,6 +731,12 @@ const translations = {
     auto: 'Oto',
     exportTitle: 'Dışa Aktarma',
     quality: 'Kalite',
+    exportResize: 'Çıktı Boyutu',
+    originalSize: 'Orijinal',
+    widthResize1080: 'Genişlik 1080px',
+    instaOptimize: '📷 Instagram Optimize',
+    instaOptimizeDesc: 'Genişlik 1080px · JPEG %92 · Instagram için ideal',
+    exportDimensions: 'Çıktı boyutu',
     presets: 'Presetler',
     presetName: 'Preset adı...',
     save: 'Kaydet',
@@ -772,6 +779,7 @@ const translations = {
     iso: 'ISO',
     shutter: 'Shutter Speed',
     aperture: 'Aperture',
+    focalLength: 'Focal Length',
     settings: 'Settings',
     crop: 'Crop (Aspect Ratio)',
     original: 'Original',
@@ -810,6 +818,12 @@ const translations = {
     auto: 'Auto',
     exportTitle: 'Export',
     quality: 'Quality',
+    exportResize: 'Output Size',
+    originalSize: 'Original',
+    widthResize1080: 'Width 1080px',
+    instaOptimize: '📷 Instagram Optimize',
+    instaOptimizeDesc: 'Width 1080px · JPEG 92% · Ideal for Instagram',
+    exportDimensions: 'Output size',
     presets: 'Presets',
     presetName: 'Preset name...',
     save: 'Save',
@@ -925,7 +939,7 @@ const defaultSettings = {
     borderRadius: 24,
     verticalPosition: 85,
     padding: 32,
-    textTemplate: '{camera}\n{lens}\nISO {iso}  ·  {shutterSpeed}s  ·  {aperture}'
+    textTemplate: '{camera}\n{lens}\nISO {iso}  ·  {shutterSpeed}s  ·  {aperture}  ·  {focalLength}'
   },
   beforeAfter: {
     direction: 'left-right',
@@ -949,7 +963,8 @@ const defaultSettings = {
   exportSettings: {
     format: 'jpeg',
     jpegQuality: 92,
-    aspectRatio: 'original'
+    aspectRatio: 'original',
+    resizeMode: 'original'
   }
 };
 
@@ -962,7 +977,7 @@ const initialState = {
   editedFile: null,
   editedImage: null,
   editedThumb: null,
-  exif: { camera: '', lens: '', iso: '', shutterSpeed: '', aperture: '' },
+  exif: { camera: '', lens: '', iso: '', shutterSpeed: '', aperture: '', focalLength: '' },
   exifLoading: false,
   exifError: null,
   activeTab: 'overlay',
@@ -1106,7 +1121,7 @@ async function parseExif(file) {
   }
 
   if (!data) {
-    return { camera: '', lens: '', iso: '', shutterSpeed: '', aperture: '', _empty: true };
+    return { camera: '', lens: '', iso: '', shutterSpeed: '', aperture: '', focalLength: '', _empty: true };
   }
 
   const make = data.Make || '';
@@ -1120,11 +1135,12 @@ async function parseExif(file) {
   const exposureTime = data.ExposureTime;
   const shutterSpeed = exposureTime ? (exposureTime < 1 ? `1/${Math.round(1/exposureTime)}` : `${exposureTime}`) : '';
   const aperture = data.FNumber ? `f/${data.FNumber}` : '';
+  const focalLength = data.FocalLength ? `${data.FocalLength}mm` : '';
 
-  const result = { camera: camera.replace(/\s+/g, ' ').trim(), lens: String(lens), iso, shutterSpeed, aperture };
+  const result = { camera: camera.replace(/\s+/g, ' ').trim(), lens: String(lens), iso, shutterSpeed, aperture, focalLength };
 
   // Flag if no useful EXIF field was found
-  if (!result.camera && !result.lens && !result.iso && !result.shutterSpeed && !result.aperture) {
+  if (!result.camera && !result.lens && !result.iso && !result.shutterSpeed && !result.aperture && !result.focalLength) {
     result._empty = true;
   }
 
@@ -1214,7 +1230,8 @@ function ExifDisplay({ exif, exifLoading, exifError, dispatch }) {
     { key: 'lens', label: t('lens') },
     { key: 'iso', label: t('iso') },
     { key: 'shutterSpeed', label: t('shutter') },
-    { key: 'aperture', label: t('aperture') }
+    { key: 'aperture', label: t('aperture') },
+    { key: 'focalLength', label: t('focalLength') }
   ];
 
   const isInfoMessage = exifError && exifError.startsWith('info:');
@@ -1311,10 +1328,10 @@ function SettingsPanel({ state, dispatch }) {
               resize: 'vertical',
               lineHeight: 1.5
             }}
-            placeholder="{camera}&#10;{lens}&#10;ISO {iso}  ·  {shutterSpeed}s  ·  {aperture}"
+            placeholder="{camera}&#10;{lens}&#10;ISO {iso}  ·  {shutterSpeed}s  ·  {aperture}  ·  {focalLength}"
           />
           <div style={{ fontSize: 10, color: 'var(--text-muted)', opacity: 0.7, lineHeight: 1.5 }}>
-            {t('templateVars')} <code style={{ background: 'var(--surface2)', padding: '1px 4px', borderRadius: 4 }}>{'{camera}'}</code> <code style={{ background: 'var(--surface2)', padding: '1px 4px', borderRadius: 4 }}>{'{lens}'}</code> <code style={{ background: 'var(--surface2)', padding: '1px 4px', borderRadius: 4 }}>{'{iso}'}</code> <code style={{ background: 'var(--surface2)', padding: '1px 4px', borderRadius: 4 }}>{'{shutterSpeed}'}</code> <code style={{ background: 'var(--surface2)', padding: '1px 4px', borderRadius: 4 }}>{'{aperture}'}</code>
+            {t('templateVars')} <code style={{ background: 'var(--surface2)', padding: '1px 4px', borderRadius: 4 }}>{'{camera}'}</code> <code style={{ background: 'var(--surface2)', padding: '1px 4px', borderRadius: 4 }}>{'{lens}'}</code> <code style={{ background: 'var(--surface2)', padding: '1px 4px', borderRadius: 4 }}>{'{iso}'}</code> <code style={{ background: 'var(--surface2)', padding: '1px 4px', borderRadius: 4 }}>{'{shutterSpeed}'}</code> <code style={{ background: 'var(--surface2)', padding: '1px 4px', borderRadius: 4 }}>{'{aperture}'}</code> <code style={{ background: 'var(--surface2)', padding: '1px 4px', borderRadius: 4 }}>{'{focalLength}'}</code>
             <br/>{t('templateHelp')}
           </div>
           <button
@@ -1501,6 +1518,32 @@ function SettingsPanel({ state, dispatch }) {
             <span className="range-value">{exportSettings.jpegQuality}%</span>
           </div>
         )}
+        <button
+          style={{
+            width: '100%',
+            padding: '10px 14px',
+            border: exportSettings.resizeMode === 'insta' ? '2px solid var(--accent1)' : '1px solid var(--border)',
+            borderRadius: 10,
+            background: exportSettings.resizeMode === 'insta' ? 'rgba(249,115,22,0.1)' : 'var(--surface2)',
+            color: exportSettings.resizeMode === 'insta' ? 'var(--accent1)' : 'var(--text-muted)',
+            fontSize: 13,
+            fontWeight: 600,
+            fontFamily: 'var(--font)',
+            cursor: 'pointer',
+            textAlign: 'left',
+            transition: 'all 0.2s'
+          }}
+          onClick={() => {
+            if (exportSettings.resizeMode === 'insta') {
+              dispatch({ type: 'UPDATE_EXPORT', data: { resizeMode: 'original' } });
+            } else {
+              dispatch({ type: 'UPDATE_EXPORT', data: { resizeMode: 'insta', format: 'jpeg', jpegQuality: 92 } });
+            }
+          }}
+        >
+          {t('instaOptimize')}
+          <div style={{ fontSize: 10, fontWeight: 400, opacity: 0.7, marginTop: 2 }}>{t('instaOptimizeDesc')}</div>
+        </button>
       </Accordion>
     </div>
   );
@@ -1649,13 +1692,14 @@ function CanvasPreview({ state, canvasRef }) {
       ctx.drawImage(mainImg, crop.sx, crop.sy, crop.sw, crop.sh, 0, 0, crop.sw, crop.sh);
 
       // Build text lines from template
-      const templateStr = overlay.textTemplate || '{camera}\n{lens}\nISO {iso}  ·  {shutterSpeed}s  ·  {aperture}';
+      const templateStr = overlay.textTemplate || '{camera}\n{lens}\nISO {iso}  ·  {shutterSpeed}s  ·  {aperture}  ·  {focalLength}';
       const replacements = {
         camera: exif.camera || '',
         lens: exif.lens || '',
         iso: exif.iso || '',
         shutterSpeed: exif.shutterSpeed || '',
-        aperture: exif.aperture || ''
+        aperture: exif.aperture || '',
+        focalLength: exif.focalLength || ''
       };
       const rawLines = templateStr.split('\n').map(line => {
         let result = line;
@@ -2128,13 +2172,78 @@ function App() {
     }
   }
 
+  function getExportDimensions() {
+    const canvas = canvasRef.current;
+    if (!canvas || !canvas.width) return null;
+    const { resizeMode } = state.exportSettings;
+    let w = canvas.width, h = canvas.height;
+    if (resizeMode === 'width1080' || resizeMode === 'insta') {
+      if (w > 1080) {
+        const scale = 1080 / w;
+        w = 1080;
+        h = Math.round(canvas.height * scale);
+      }
+    }
+    return { w, h };
+  }
+
+  function getExportFileSize() {
+    const canvas = canvasRef.current;
+    if (!canvas || !canvas.width) return null;
+    try {
+      let { format, jpegQuality, resizeMode } = state.exportSettings;
+      if (resizeMode === 'insta') { format = 'jpeg'; jpegQuality = 92; }
+      const mime = format === 'png' ? 'image/png' : 'image/jpeg';
+      const quality = format === 'jpeg' ? jpegQuality / 100 : undefined;
+
+      let src = canvas;
+      if (resizeMode === 'width1080' || resizeMode === 'insta') {
+        if (canvas.width > 1080) {
+          const scale = 1080 / canvas.width;
+          const tmp = document.createElement('canvas');
+          tmp.width = 1080;
+          tmp.height = Math.round(canvas.height * scale);
+          tmp.getContext('2d').drawImage(canvas, 0, 0, tmp.width, tmp.height);
+          src = tmp;
+        }
+      }
+
+      const dataUrl = src.toDataURL(mime, quality);
+      const bytes = Math.round((dataUrl.length - (dataUrl.indexOf(',') + 1)) * 3 / 4);
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+      return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+    } catch { return null; }
+  }
+
   function handleDownload() {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const { format, jpegQuality } = state.exportSettings;
+    let { format, jpegQuality, resizeMode } = state.exportSettings;
+    // Instagram optimize overrides
+    if (resizeMode === 'insta') {
+      format = 'jpeg';
+      jpegQuality = 92;
+    }
     const mime = format === 'png' ? 'image/png' : 'image/jpeg';
     const quality = format === 'jpeg' ? jpegQuality / 100 : undefined;
-    const dataUrl = canvas.toDataURL(mime, quality);
+
+    let exportCanvas = canvas;
+    if (resizeMode === 'width1080' || resizeMode === 'insta') {
+      if (canvas.width > 1080) {
+        const scale = 1080 / canvas.width;
+        const newW = 1080;
+        const newH = Math.round(canvas.height * scale);
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = newW;
+        tempCanvas.height = newH;
+        const tempCtx = tempCanvas.getContext('2d');
+        tempCtx.drawImage(canvas, 0, 0, newW, newH);
+        exportCanvas = tempCanvas;
+      }
+    }
+
+    const dataUrl = exportCanvas.toDataURL(mime, quality);
     const a = document.createElement('a');
     const tabName = state.activeTab === 'overlay' ? 'exif_overlay' : 'before_after';
     // Use original unedited filename (without extension) as prefix
@@ -2240,9 +2349,28 @@ function App() {
         {/* Canvas */}
         <CanvasPreview state={state} canvasRef={canvasRef} />
 
+        {/* Export dimensions info */}
+        {hasImage && (() => {
+          const dims = getExportDimensions();
+          if (!dims) return null;
+          const mode = state.exportSettings.resizeMode;
+          const fileSize = getExportFileSize();
+          return (
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              fontSize: 12, color: 'var(--text-muted)', padding: '4px 0', flexWrap: 'wrap'
+            }}>
+              <span>{t('exportDimensions')}: <strong style={{ color: 'var(--text)', fontFamily: "'JetBrains Mono', monospace" }}>{dims.w} × {dims.h}</strong></span>
+              {fileSize && <span style={{ fontFamily: "'JetBrains Mono', monospace", opacity: 0.7 }}>·</span>}
+              {fileSize && <strong style={{ color: 'var(--text)', fontFamily: "'JetBrains Mono', monospace" }}>{fileSize}</strong>}
+              {mode === 'insta' && <span style={{ fontSize: 10, background: 'rgba(249,115,22,0.15)', color: 'var(--accent1)', padding: '2px 8px', borderRadius: 6, fontWeight: 600 }}>IG</span>}
+            </div>
+          );
+        })()}
+
         {/* Download */}
         <button className="download-btn" disabled={!hasImage} onClick={handleDownload}>
-          ⬇ {t('download')} ({state.exportSettings.format.toUpperCase()})
+          ⬇ {t('download')} ({state.exportSettings.format.toUpperCase()}{state.exportSettings.resizeMode === 'insta' ? ' · IG' : ''})
         </button>
       </div>
 
