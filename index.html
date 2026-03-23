@@ -2137,7 +2137,13 @@ function App() {
     const dataUrl = canvas.toDataURL(mime, quality);
     const a = document.createElement('a');
     const tabName = state.activeTab === 'overlay' ? 'exif_overlay' : 'before_after';
-    a.download = `instagram_${tabName}_${Date.now()}.${format === 'png' ? 'png' : 'jpg'}`;
+    // Use original unedited filename (without extension) as prefix
+    let prefix = 'instagram';
+    const srcFile = state.uneditedFile || state.editedFile;
+    if (srcFile && srcFile.name) {
+      prefix = srcFile.name.replace(/\.[^/.]+$/, '');
+    }
+    a.download = `${prefix}_${tabName}.${format === 'png' ? 'png' : 'jpg'}`;
     a.href = dataUrl;
     a.click();
     dispatch({ type: 'NOTIFY', message: t('photoDownloaded') });
