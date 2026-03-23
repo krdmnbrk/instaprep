@@ -974,6 +974,13 @@ const initialState = {
   notification: null
 };
 
+// Capture page-load settings as the reset target for double-click
+const pageDefaults = {
+  overlay: { ...initialState.overlay },
+  beforeAfter: { ...initialState.beforeAfter },
+  exportSettings: { ...initialState.exportSettings }
+};
+
 function reducer(state, action) {
   switch (action.type) {
     case 'SET_UNEDITED':
@@ -1335,7 +1342,7 @@ function SettingsPanel({ state, dispatch }) {
         </div>
         <div className="control-row">
           <label>{t('fontSize')}</label>
-          <input type="range" min="16" max="192" value={overlay.fontSize} onChange={e => dispatch({ type: 'UPDATE_OVERLAY', data: { fontSize: +e.target.value } })} />
+          <input type="range" min="16" max="192" value={overlay.fontSize} onChange={e => dispatch({ type: 'UPDATE_OVERLAY', data: { fontSize: +e.target.value } })} onDoubleClick={() => dispatch({ type: 'UPDATE_OVERLAY', data: { fontSize: pageDefaults.overlay.fontSize } })} />
           <span className="range-value">{overlay.fontSize}px</span>
         </div>
         <div className="control-row">
@@ -1348,27 +1355,27 @@ function SettingsPanel({ state, dispatch }) {
         </div>
         <div className="control-row">
           <label>{t('bgOpacity')}</label>
-          <input type="range" min="0" max="100" value={Math.round(overlay.bgOpacity * 100)} onChange={e => dispatch({ type: 'UPDATE_OVERLAY', data: { bgOpacity: e.target.value / 100 } })} />
+          <input type="range" min="0" max="100" value={Math.round(overlay.bgOpacity * 100)} onChange={e => dispatch({ type: 'UPDATE_OVERLAY', data: { bgOpacity: e.target.value / 100 } })} onDoubleClick={() => dispatch({ type: 'UPDATE_OVERLAY', data: { bgOpacity: pageDefaults.overlay.bgOpacity } })} />
           <span className="range-value">{Math.round(overlay.bgOpacity * 100)}%</span>
         </div>
         <div className="control-row">
           <label>{t('blur')}</label>
-          <input type="range" min="0" max="200" value={overlay.blur} onChange={e => dispatch({ type: 'UPDATE_OVERLAY', data: { blur: +e.target.value } })} />
+          <input type="range" min="0" max="200" value={overlay.blur} onChange={e => dispatch({ type: 'UPDATE_OVERLAY', data: { blur: +e.target.value } })} onDoubleClick={() => dispatch({ type: 'UPDATE_OVERLAY', data: { blur: pageDefaults.overlay.blur } })} />
           <span className="range-value">{overlay.blur}px</span>
         </div>
         <div className="control-row">
           <label>{t('borderRadius')}</label>
-          <input type="range" min="0" max="200" value={overlay.borderRadius} onChange={e => dispatch({ type: 'UPDATE_OVERLAY', data: { borderRadius: +e.target.value } })} />
+          <input type="range" min="0" max="200" value={overlay.borderRadius} onChange={e => dispatch({ type: 'UPDATE_OVERLAY', data: { borderRadius: +e.target.value } })} onDoubleClick={() => dispatch({ type: 'UPDATE_OVERLAY', data: { borderRadius: pageDefaults.overlay.borderRadius } })} />
           <span className="range-value">{overlay.borderRadius}px</span>
         </div>
         <div className="control-row">
           <label>{t('verticalPos')}</label>
-          <input type="range" min="5" max="95" value={overlay.verticalPosition} onChange={e => dispatch({ type: 'UPDATE_OVERLAY', data: { verticalPosition: +e.target.value } })} />
+          <input type="range" min="5" max="95" value={overlay.verticalPosition} onChange={e => dispatch({ type: 'UPDATE_OVERLAY', data: { verticalPosition: +e.target.value } })} onDoubleClick={() => dispatch({ type: 'UPDATE_OVERLAY', data: { verticalPosition: pageDefaults.overlay.verticalPosition } })} />
           <span className="range-value">{overlay.verticalPosition}%</span>
         </div>
         <div className="control-row">
           <label>{t('padding')}</label>
-          <input type="range" min="8" max="200" value={overlay.padding} onChange={e => dispatch({ type: 'UPDATE_OVERLAY', data: { padding: +e.target.value } })} />
+          <input type="range" min="8" max="200" value={overlay.padding} onChange={e => dispatch({ type: 'UPDATE_OVERLAY', data: { padding: +e.target.value } })} onDoubleClick={() => dispatch({ type: 'UPDATE_OVERLAY', data: { padding: pageDefaults.overlay.padding } })} />
           <span className="range-value">{overlay.padding}px</span>
         </div>
       </Accordion>
@@ -1390,7 +1397,7 @@ function SettingsPanel({ state, dispatch }) {
         </div>
         <div className="control-row">
           <label>{t('splitRatio')}</label>
-          <input type="range" min="10" max="90" value={beforeAfter.splitRatio} onChange={e => dispatch({ type: 'UPDATE_BEFORE_AFTER', data: { splitRatio: +e.target.value } })} />
+          <input type="range" min="10" max="90" value={beforeAfter.splitRatio} onChange={e => dispatch({ type: 'UPDATE_BEFORE_AFTER', data: { splitRatio: +e.target.value } })} onDoubleClick={() => dispatch({ type: 'UPDATE_BEFORE_AFTER', data: { splitRatio: pageDefaults.beforeAfter.splitRatio } })} />
           <span className="range-value">{beforeAfter.splitRatio}%</span>
         </div>
         <div className="checkbox-row">
@@ -1405,7 +1412,7 @@ function SettingsPanel({ state, dispatch }) {
             </div>
             <div className="control-row">
               <label>{t('dividerWidth')}</label>
-              <input type="range" min="1" max="8" value={beforeAfter.dividerWidth} onChange={e => dispatch({ type: 'UPDATE_BEFORE_AFTER', data: { dividerWidth: +e.target.value } })} />
+              <input type="range" min="1" max="8" value={beforeAfter.dividerWidth} onChange={e => dispatch({ type: 'UPDATE_BEFORE_AFTER', data: { dividerWidth: +e.target.value } })} onDoubleClick={() => dispatch({ type: 'UPDATE_BEFORE_AFTER', data: { dividerWidth: pageDefaults.beforeAfter.dividerWidth } })} />
               <span className="range-value">{beforeAfter.dividerWidth}px</span>
             </div>
           </>
@@ -1438,7 +1445,7 @@ function SettingsPanel({ state, dispatch }) {
             </div>
             <div className="control-row">
               <label>{t('fontSize')}</label>
-              <input type="range" min="0" max="192" value={beforeAfter.labelFontSize} onChange={e => dispatch({ type: 'UPDATE_BEFORE_AFTER', data: { labelFontSize: +e.target.value } })} />
+              <input type="range" min="0" max="192" value={beforeAfter.labelFontSize} onChange={e => dispatch({ type: 'UPDATE_BEFORE_AFTER', data: { labelFontSize: +e.target.value } })} onDoubleClick={() => dispatch({ type: 'UPDATE_BEFORE_AFTER', data: { labelFontSize: pageDefaults.beforeAfter.labelFontSize } })} />
               <span className="range-value">{beforeAfter.labelFontSize === 0 ? t('auto') : beforeAfter.labelFontSize + 'px'}</span>
             </div>
             <div className="control-row">
@@ -1451,27 +1458,27 @@ function SettingsPanel({ state, dispatch }) {
             </div>
             <div className="control-row">
               <label>{t('bgOpacity')}</label>
-              <input type="range" min="0" max="100" value={Math.round(beforeAfter.labelBgOpacity * 100)} onChange={e => dispatch({ type: 'UPDATE_BEFORE_AFTER', data: { labelBgOpacity: e.target.value / 100 } })} />
+              <input type="range" min="0" max="100" value={Math.round(beforeAfter.labelBgOpacity * 100)} onChange={e => dispatch({ type: 'UPDATE_BEFORE_AFTER', data: { labelBgOpacity: e.target.value / 100 } })} onDoubleClick={() => dispatch({ type: 'UPDATE_BEFORE_AFTER', data: { labelBgOpacity: pageDefaults.beforeAfter.labelBgOpacity } })} />
               <span className="range-value">{Math.round(beforeAfter.labelBgOpacity * 100)}%</span>
             </div>
             <div className="control-row">
               <label>{t('blur')}</label>
-              <input type="range" min="0" max="200" value={beforeAfter.labelBlur} onChange={e => dispatch({ type: 'UPDATE_BEFORE_AFTER', data: { labelBlur: +e.target.value } })} />
+              <input type="range" min="0" max="200" value={beforeAfter.labelBlur} onChange={e => dispatch({ type: 'UPDATE_BEFORE_AFTER', data: { labelBlur: +e.target.value } })} onDoubleClick={() => dispatch({ type: 'UPDATE_BEFORE_AFTER', data: { labelBlur: pageDefaults.beforeAfter.labelBlur } })} />
               <span className="range-value">{beforeAfter.labelBlur}px</span>
             </div>
             <div className="control-row">
               <label>{t('borderRadius')}</label>
-              <input type="range" min="0" max="200" value={beforeAfter.labelBorderRadius} onChange={e => dispatch({ type: 'UPDATE_BEFORE_AFTER', data: { labelBorderRadius: +e.target.value } })} />
+              <input type="range" min="0" max="200" value={beforeAfter.labelBorderRadius} onChange={e => dispatch({ type: 'UPDATE_BEFORE_AFTER', data: { labelBorderRadius: +e.target.value } })} onDoubleClick={() => dispatch({ type: 'UPDATE_BEFORE_AFTER', data: { labelBorderRadius: pageDefaults.beforeAfter.labelBorderRadius } })} />
               <span className="range-value">{beforeAfter.labelBorderRadius}px</span>
             </div>
             <div className="control-row">
               <label>{t('padding')}</label>
-              <input type="range" min="0" max="200" value={beforeAfter.labelPadding} onChange={e => dispatch({ type: 'UPDATE_BEFORE_AFTER', data: { labelPadding: +e.target.value } })} />
+              <input type="range" min="0" max="200" value={beforeAfter.labelPadding} onChange={e => dispatch({ type: 'UPDATE_BEFORE_AFTER', data: { labelPadding: +e.target.value } })} onDoubleClick={() => dispatch({ type: 'UPDATE_BEFORE_AFTER', data: { labelPadding: pageDefaults.beforeAfter.labelPadding } })} />
               <span className="range-value">{beforeAfter.labelPadding === 0 ? t('auto') : beforeAfter.labelPadding + 'px'}</span>
             </div>
             <div className="control-row">
               <label>{t('verticalPos')}</label>
-              <input type="range" min="5" max="95" value={beforeAfter.labelVerticalPosition} onChange={e => dispatch({ type: 'UPDATE_BEFORE_AFTER', data: { labelVerticalPosition: +e.target.value } })} />
+              <input type="range" min="5" max="95" value={beforeAfter.labelVerticalPosition} onChange={e => dispatch({ type: 'UPDATE_BEFORE_AFTER', data: { labelVerticalPosition: +e.target.value } })} onDoubleClick={() => dispatch({ type: 'UPDATE_BEFORE_AFTER', data: { labelVerticalPosition: pageDefaults.beforeAfter.labelVerticalPosition } })} />
               <span className="range-value">{beforeAfter.labelVerticalPosition}%</span>
             </div>
           </>
@@ -1490,7 +1497,7 @@ function SettingsPanel({ state, dispatch }) {
         {exportSettings.format === 'jpeg' && (
           <div className="control-row">
             <label>{t('quality')}</label>
-            <input type="range" min="50" max="100" value={exportSettings.jpegQuality} onChange={e => dispatch({ type: 'UPDATE_EXPORT', data: { jpegQuality: +e.target.value } })} />
+            <input type="range" min="50" max="100" value={exportSettings.jpegQuality} onChange={e => dispatch({ type: 'UPDATE_EXPORT', data: { jpegQuality: +e.target.value } })} onDoubleClick={() => dispatch({ type: 'UPDATE_EXPORT', data: { jpegQuality: pageDefaults.exportSettings.jpegQuality } })} />
             <span className="range-value">{exportSettings.jpegQuality}%</span>
           </div>
         )}
