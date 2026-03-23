@@ -1,0 +1,1781 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Instagram Fotoğraf Hazırlama Aracı</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Playfair+Display:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/exifr/dist/full.umd.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #0a0a0a;
+  --surface: #1a1a1a;
+  --surface2: #252525;
+  --border: rgba(255,255,255,0.08);
+  --text: #e5e5e5;
+  --text-muted: #888;
+  --accent1: #f97316;
+  --accent2: #ec4899;
+  --radius: 16px;
+  --radius-sm: 10px;
+  --font: 'DM Sans', sans-serif;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+
+/* Glass card */
+.glass {
+  background: rgba(255,255,255,0.05);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+/* Layout */
+.app-container {
+  display: flex;
+  min-height: 100vh;
+}
+
+.sidebar {
+  width: 360px;
+  min-width: 360px;
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  max-height: 100vh;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.main-area {
+  flex: 1;
+  padding: 24px;
+  overflow-y: auto;
+  max-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Header */
+.header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.header-logo {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--accent1), var(--accent2));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.header h1 {
+  font-family: 'Outfit', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--accent1), var(--accent2));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  line-height: 1.2;
+}
+
+.header p {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* Drop Zone */
+.dropzone-row { display: flex; gap: 12px; }
+.dropzone-row > div { flex: 1; }
+
+.dropzone {
+  border: 2px dashed rgba(255,255,255,0.12);
+  border-radius: var(--radius-sm);
+  padding: 20px 12px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+  overflow: hidden;
+  min-height: 120px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.dropzone:hover, .dropzone.drag-over {
+  border-color: var(--accent1);
+  background: rgba(249, 115, 22, 0.05);
+}
+
+.dropzone.has-image {
+  border-style: solid;
+  border-color: rgba(255,255,255,0.15);
+  padding: 0;
+}
+
+.dropzone .thumb {
+  width: 100%;
+  height: 120px;
+  object-fit: cover;
+  border-radius: calc(var(--radius-sm) - 2px);
+}
+
+.dropzone .icon { font-size: 28px; opacity: 0.5; }
+.dropzone .label { font-size: 12px; color: var(--text-muted); font-weight: 500; }
+.dropzone .sublabel { font-size: 10px; color: var(--text-muted); opacity: 0.6; }
+
+.dropzone .remove-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.7);
+  border: none;
+  color: #fff;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+}
+
+/* Section */
+.section-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--text-muted);
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+/* EXIF display */
+.exif-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.exif-field label {
+  display: block;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+  font-weight: 500;
+}
+
+.exif-field input {
+  width: 100%;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: var(--text);
+  font-size: 13px;
+  font-family: 'JetBrains Mono', monospace;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.exif-field input:focus {
+  border-color: var(--accent1);
+}
+
+/* Accordion */
+.accordion { border-radius: var(--radius-sm); overflow: hidden; }
+
+.accordion-header {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: var(--font);
+  transition: background 0.2s;
+}
+
+.accordion-header:hover { background: var(--surface2); }
+
+.accordion-header .arrow {
+  transition: transform 0.2s;
+  font-size: 10px;
+  opacity: 0.5;
+}
+.accordion-header.open .arrow { transform: rotate(180deg); }
+
+.accordion-body {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-top: none;
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  margin-top: -10px;
+  padding-top: 20px;
+}
+
+/* Controls */
+.control-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.control-row label {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.control-row select,
+.control-row input[type="number"] {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 10px;
+  color: var(--text);
+  font-size: 12px;
+  font-family: var(--font);
+  outline: none;
+  min-width: 0;
+  flex-shrink: 1;
+}
+
+.control-row select { max-width: 160px; }
+
+.control-row input[type="range"] {
+  flex: 1;
+  max-width: 140px;
+  accent-color: var(--accent1);
+}
+
+.control-row input[type="color"] {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: none;
+  cursor: pointer;
+  padding: 2px;
+}
+
+.range-value {
+  font-size: 11px;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--text-muted);
+  min-width: 36px;
+  text-align: right;
+}
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.checkbox-row input[type="checkbox"] {
+  accent-color: var(--accent1);
+  width: 16px;
+  height: 16px;
+}
+
+.checkbox-row label {
+  font-size: 12px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+/* Radio group for aspect ratio */
+.ratio-group {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.ratio-btn {
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: var(--font);
+  transition: all 0.2s;
+}
+
+.ratio-btn.active {
+  background: linear-gradient(135deg, var(--accent1), var(--accent2));
+  color: #fff;
+  border-color: transparent;
+}
+
+/* Tabs */
+.tab-bar {
+  display: flex;
+  gap: 4px;
+  background: var(--surface);
+  padding: 4px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: var(--font);
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.tab-btn.active {
+  background: linear-gradient(135deg, var(--accent1), var(--accent2));
+  color: #fff;
+}
+
+.tab-btn:not(.active):hover {
+  background: rgba(255,255,255,0.05);
+  color: var(--text);
+}
+
+.tab-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* Canvas preview */
+.canvas-wrapper {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  min-height: 300px;
+  position: relative;
+}
+
+.canvas-wrapper canvas {
+  max-width: 100%;
+  max-height: calc(100vh - 200px);
+  object-fit: contain;
+}
+
+.canvas-placeholder {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 40px;
+}
+
+.canvas-placeholder .icon { font-size: 48px; opacity: 0.3; margin-bottom: 12px; }
+.canvas-placeholder p { font-size: 14px; }
+
+/* Download button */
+.download-btn {
+  width: 100%;
+  padding: 14px;
+  border: none;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--accent1), var(--accent2));
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: var(--font);
+  transition: opacity 0.2s, transform 0.1s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.download-btn:hover { opacity: 0.9; }
+.download-btn:active { transform: scale(0.98); }
+.download-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Notification */
+.notification {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 20px;
+  font-size: 13px;
+  color: var(--text);
+  z-index: 1000;
+  animation: slideIn 0.3s ease;
+  backdrop-filter: blur(20px);
+}
+
+@keyframes slideIn {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* Templates */
+.template-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.template-orientation-tabs {
+  display: flex;
+  gap: 4px;
+  background: var(--surface2);
+  padding: 3px;
+  border-radius: 8px;
+}
+
+.template-orientation-tabs button {
+  flex: 1;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--font);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.template-orientation-tabs button.active {
+  background: linear-gradient(135deg, var(--accent1), var(--accent2));
+  color: #fff;
+}
+
+.template-save-row {
+  display: flex;
+  gap: 6px;
+}
+
+.template-save-row input {
+  flex: 1;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 7px 10px;
+  color: var(--text);
+  font-size: 12px;
+  font-family: var(--font);
+  outline: none;
+}
+
+.template-save-row input:focus { border-color: var(--accent1); }
+
+.template-save-row button {
+  padding: 7px 14px;
+  border: none;
+  border-radius: 8px;
+  background: linear-gradient(135deg, var(--accent1), var(--accent2));
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: var(--font);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.template-save-row button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.template-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.template-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.template-item:hover { border-color: var(--accent1); background: rgba(249,115,22,0.06); }
+
+.template-item-name {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.template-item-delete {
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 6px;
+  background: rgba(239,68,68,0.15);
+  color: #ef4444;
+  font-size: 13px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+
+.template-item-delete:hover { background: rgba(239,68,68,0.3); }
+
+.template-empty {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 12px 0;
+  opacity: 0.6;
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+  .app-container {
+    flex-direction: column;
+  }
+  .sidebar {
+    width: 100%;
+    min-width: unset;
+    max-height: unset;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+  .main-area {
+    max-height: unset;
+  }
+  .canvas-wrapper canvas {
+    max-height: 60vh;
+  }
+}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useReducer, useRef, useEffect, useCallback, useMemo } = React;
+
+// ─── LocalStorage Helpers ──────────────────────────────────
+const STORAGE_KEY = 'instaprep_settings';
+const TEMPLATES_KEY = 'instaprep_templates';
+const PRESETS_KEY = 'instaprep_presets';
+
+function loadSettings() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return null;
+}
+
+function saveSettings(state) {
+  try {
+    const toSave = {
+      overlay: state.overlay,
+      beforeAfter: state.beforeAfter,
+      exportSettings: state.exportSettings
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
+  } catch {}
+}
+
+function loadTemplates() {
+  try {
+    const raw = localStorage.getItem(TEMPLATES_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return { portrait: {}, landscape: {} };
+}
+
+function saveTemplates(templates) {
+  try { localStorage.setItem(TEMPLATES_KEY, JSON.stringify(templates)); } catch {}
+}
+
+function extractSettingsForTemplate(state) {
+  return {
+    overlay: { ...state.overlay },
+    beforeAfter: { ...state.beforeAfter },
+    exportSettings: { ...state.exportSettings }
+  };
+}
+
+function loadPresets() {
+  try {
+    const raw = localStorage.getItem(PRESETS_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return {};
+}
+
+function savePresetsToStorage(presets) {
+  try { localStorage.setItem(PRESETS_KEY, JSON.stringify(presets)); } catch {}
+}
+
+function downloadPresetFile(name, settings) {
+  const payload = { name, version: 1, app: 'InstaPrep', settings };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `instaprep_preset_${name.replace(/\s+/g, '_').toLowerCase()}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ─── Reducer ───────────────────────────────────────────────
+const defaultSettings = {
+  overlay: {
+    fontFamily: 'DM Sans',
+    fontSize: 42,
+    fontColor: '#ffffff',
+    bgColor: '#000000',
+    bgOpacity: 0.45,
+    blur: 18,
+    borderRadius: 24,
+    verticalPosition: 85,
+    padding: 32,
+    textTemplate: '{camera}\n{lens}\nISO {iso}  ·  {shutterSpeed}s  ·  {aperture}'
+  },
+  beforeAfter: {
+    splitRatio: 50,
+    showDivider: true,
+    dividerColor: '#ffffff',
+    dividerWidth: 3,
+    showLabels: true,
+    beforeLabel: 'BEFORE',
+    afterLabel: 'AFTER',
+    labelFontFamily: 'DM Sans',
+    labelFontSize: 0,
+    labelTextColor: '#ffffff',
+    labelBgColor: '#000000',
+    labelBgOpacity: 0.55,
+    labelBlur: 0,
+    labelBorderRadius: 8,
+    labelPadding: 0,
+    labelVerticalPosition: 90
+  },
+  exportSettings: {
+    format: 'jpeg',
+    jpegQuality: 92,
+    aspectRatio: 'original'
+  }
+};
+
+const saved = loadSettings();
+
+const initialState = {
+  uneditedFile: null,
+  uneditedImage: null,
+  uneditedThumb: null,
+  editedFile: null,
+  editedImage: null,
+  editedThumb: null,
+  exif: { camera: '', lens: '', iso: '', shutterSpeed: '', aperture: '' },
+  exifLoading: false,
+  exifError: null,
+  activeTab: 'overlay',
+  overlay: saved ? { ...defaultSettings.overlay, ...saved.overlay } : defaultSettings.overlay,
+  beforeAfter: saved ? { ...defaultSettings.beforeAfter, ...saved.beforeAfter } : defaultSettings.beforeAfter,
+  exportSettings: saved ? { ...defaultSettings.exportSettings, ...saved.exportSettings } : defaultSettings.exportSettings,
+  templates: loadTemplates(),
+  presets: loadPresets(),
+  notification: null
+};
+
+function reducer(state, action) {
+  switch (action.type) {
+    case 'SET_UNEDITED':
+      return { ...state, uneditedFile: action.file, uneditedImage: action.image, uneditedThumb: action.thumb };
+    case 'SET_EDITED':
+      return { ...state, editedFile: action.file, editedImage: action.image, editedThumb: action.thumb };
+    case 'REMOVE_UNEDITED':
+      return { ...state, uneditedFile: null, uneditedImage: null, uneditedThumb: null, exif: initialState.exif, exifError: null };
+    case 'REMOVE_EDITED':
+      return { ...state, editedFile: null, editedImage: null, editedThumb: null };
+    case 'SET_EXIF':
+      return { ...state, exif: { ...state.exif, ...action.data }, exifLoading: false, exifError: null };
+    case 'SET_EXIF_LOADING':
+      return { ...state, exifLoading: true, exifError: null };
+    case 'SET_EXIF_ERROR':
+      return { ...state, exifLoading: false, exifError: action.error };
+    case 'UPDATE_EXIF_FIELD':
+      return { ...state, exif: { ...state.exif, [action.field]: action.value } };
+    case 'SET_TAB':
+      return { ...state, activeTab: action.tab };
+    case 'UPDATE_OVERLAY':
+      return { ...state, overlay: { ...state.overlay, ...action.data } };
+    case 'UPDATE_BEFORE_AFTER':
+      return { ...state, beforeAfter: { ...state.beforeAfter, ...action.data } };
+    case 'UPDATE_EXPORT':
+      return { ...state, exportSettings: { ...state.exportSettings, ...action.data } };
+    case 'SAVE_TEMPLATE': {
+      const newTemplates = { ...state.templates };
+      if (!newTemplates[action.orientation]) newTemplates[action.orientation] = {};
+      newTemplates[action.orientation][action.name] = extractSettingsForTemplate(state);
+      saveTemplates(newTemplates);
+      return { ...state, templates: newTemplates, notification: `"${action.name}" (${action.orientation}) kaydedildi` };
+    }
+    case 'LOAD_TEMPLATE': {
+      const tpl = state.templates[action.orientation]?.[action.name];
+      if (!tpl) return state;
+      return {
+        ...state,
+        overlay: { ...defaultSettings.overlay, ...tpl.overlay },
+        beforeAfter: { ...defaultSettings.beforeAfter, ...tpl.beforeAfter },
+        exportSettings: { ...defaultSettings.exportSettings, ...tpl.exportSettings },
+        notification: `"${action.name}" (${action.orientation}) yüklendi`
+      };
+    }
+    case 'DELETE_TEMPLATE': {
+      const newTemplates = { ...state.templates };
+      if (newTemplates[action.orientation]) {
+        const copy = { ...newTemplates[action.orientation] };
+        delete copy[action.name];
+        newTemplates[action.orientation] = copy;
+      }
+      saveTemplates(newTemplates);
+      return { ...state, templates: newTemplates, notification: `"${action.name}" silindi` };
+    }
+    case 'SAVE_PRESET': {
+      const settings = extractSettingsForTemplate(state);
+      const newPresets = { ...state.presets, [action.name]: { ...settings, savedAt: new Date().toISOString() } };
+      savePresetsToStorage(newPresets);
+      return { ...state, presets: newPresets, notification: `"${action.name}" preset kaydedildi` };
+    }
+    case 'LOAD_PRESET': {
+      const p = state.presets[action.name];
+      if (!p) return state;
+      return {
+        ...state,
+        overlay: { ...defaultSettings.overlay, ...p.overlay },
+        beforeAfter: { ...defaultSettings.beforeAfter, ...p.beforeAfter },
+        exportSettings: { ...defaultSettings.exportSettings, ...p.exportSettings },
+        notification: `"${action.name}" preset yüklendi`
+      };
+    }
+    case 'DELETE_PRESET': {
+      const newPresets = { ...state.presets };
+      delete newPresets[action.name];
+      savePresetsToStorage(newPresets);
+      return { ...state, presets: newPresets, notification: `"${action.name}" preset silindi` };
+    }
+    case 'IMPORT_PRESET': {
+      const { name, settings } = action;
+      const newPresets = { ...state.presets, [name]: { ...settings, savedAt: new Date().toISOString() } };
+      savePresetsToStorage(newPresets);
+      return {
+        ...state,
+        presets: newPresets,
+        overlay: { ...defaultSettings.overlay, ...settings.overlay },
+        beforeAfter: { ...defaultSettings.beforeAfter, ...settings.beforeAfter },
+        exportSettings: { ...defaultSettings.exportSettings, ...settings.exportSettings },
+        notification: `"${name}" preset içe aktarıldı ve uygulandı`
+      };
+    }
+    case 'NOTIFY':
+      return { ...state, notification: action.message };
+    case 'CLEAR_NOTIFY':
+      return { ...state, notification: null };
+    default:
+      return state;
+  }
+}
+
+// ─── Helpers ───────────────────────────────────────────────
+function loadImage(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => resolve({ image: img, thumb: url });
+    img.onerror = () => reject(new Error('Görsel yüklenemedi'));
+    img.src = url;
+  });
+}
+
+async function parseExif(file) {
+  let data;
+  try {
+    // Try broadest parse first to capture all possible EXIF segments
+    data = await exifr.parse(file, true);
+  } catch (e1) {
+    // Fallback with specific options
+    try {
+      data = await exifr.parse(file, { tiff: true, exif: true, ifd1: true, xmp: true, iptc: true });
+    } catch (e2) {
+      throw new Error('EXIF verisi okunamadı: ' + (e2.message || 'bilinmeyen hata'));
+    }
+  }
+
+  if (!data) {
+    return { camera: '', lens: '', iso: '', shutterSpeed: '', aperture: '', _empty: true };
+  }
+
+  const make = data.Make || '';
+  const model = data.Model || '';
+  // Avoid duplicate make in model string (e.g. "SONY ILCE-7M3" when Make="SONY")
+  const camera = make && model.toLowerCase().startsWith(make.toLowerCase())
+    ? model
+    : [make, model].filter(Boolean).join(' ');
+  const lens = data.LensModel || data.Lens || data.LensInfo || '';
+  const iso = (data.ISO || data.ISOSpeedRatings) ? String(data.ISO || data.ISOSpeedRatings) : '';
+  const exposureTime = data.ExposureTime;
+  const shutterSpeed = exposureTime ? (exposureTime < 1 ? `1/${Math.round(1/exposureTime)}` : `${exposureTime}`) : '';
+  const aperture = data.FNumber ? `f/${data.FNumber}` : '';
+
+  const result = { camera: camera.replace(/\s+/g, ' ').trim(), lens: String(lens), iso, shutterSpeed, aperture };
+
+  // Flag if no useful EXIF field was found
+  if (!result.camera && !result.lens && !result.iso && !result.shutterSpeed && !result.aperture) {
+    result._empty = true;
+  }
+
+  return result;
+}
+
+function getCropRect(imgW, imgH, ratio) {
+  if (ratio === 'original') return { sx: 0, sy: 0, sw: imgW, sh: imgH };
+  const ratioMap = { '1:1': 1, '4:5': 4/5, '16:9': 16/9 };
+  const target = ratioMap[ratio];
+  const imgRatio = imgW / imgH;
+  let sw, sh, sx, sy;
+  if (imgRatio > target) {
+    sh = imgH; sw = Math.round(imgH * target);
+    sx = Math.round((imgW - sw) / 2); sy = 0;
+  } else {
+    sw = imgW; sh = Math.round(imgW / target);
+    sx = 0; sy = Math.round((imgH - sh) / 2);
+  }
+  return { sx, sy, sw, sh };
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  r = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.arcTo(x + w, y, x + w, y + r, r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+  ctx.lineTo(x + r, y + h);
+  ctx.arcTo(x, y + h, x, y + h - r, r);
+  ctx.lineTo(x, y + r);
+  ctx.arcTo(x, y, x + r, y, r);
+  ctx.closePath();
+}
+
+// ─── DropZone ──────────────────────────────────────────────
+function DropZone({ label, thumb, onFile, onRemove }) {
+  const [dragOver, setDragOver] = useState(false);
+  const inputRef = useRef();
+
+  function handleDrop(e) {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files[0];
+    if (file && file.type.startsWith('image/')) onFile(file);
+  }
+
+  function handleChange(e) {
+    const file = e.target.files[0];
+    if (file) onFile(file);
+    e.target.value = '';
+  }
+
+  return (
+    <div
+      className={`dropzone ${dragOver ? 'drag-over' : ''} ${thumb ? 'has-image' : ''}`}
+      onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+      onDragLeave={() => setDragOver(false)}
+      onDrop={handleDrop}
+      onClick={() => !thumb && inputRef.current.click()}
+    >
+      <input ref={inputRef} type="file" accept="image/*" hidden onChange={handleChange} />
+      {thumb ? (
+        <>
+          <img className="thumb" src={thumb} alt={label} />
+          <button className="remove-btn" onClick={e => { e.stopPropagation(); onRemove(); }}>×</button>
+        </>
+      ) : (
+        <>
+          <div className="icon">+</div>
+          <div className="label">{label}</div>
+          <div className="sublabel">Sürükle veya tıkla</div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ─── EXIF Display ──────────────────────────────────────────
+function ExifDisplay({ exif, exifLoading, exifError, dispatch }) {
+  const fields = [
+    { key: 'camera', label: 'Kamera' },
+    { key: 'lens', label: 'Lens' },
+    { key: 'iso', label: 'ISO' },
+    { key: 'shutterSpeed', label: 'Enstantane' },
+    { key: 'aperture', label: 'Diyafram' }
+  ];
+
+  const isInfoMessage = exifError && exifError.startsWith('info:');
+  const displayError = exifError ? (isInfoMessage ? exifError.slice(5) : exifError) : null;
+
+  return (
+    <div>
+      <div className="section-title">EXIF Bilgileri</div>
+      {exifLoading && <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>EXIF okunuyor...</div>}
+      {displayError && (
+        <div style={{
+          fontSize: 12,
+          color: isInfoMessage ? 'var(--accent1)' : '#ef4444',
+          marginBottom: 8,
+          padding: '8px 10px',
+          background: isInfoMessage ? 'rgba(249,115,22,0.08)' : 'rgba(239,68,68,0.08)',
+          borderRadius: 8,
+          border: `1px solid ${isInfoMessage ? 'rgba(249,115,22,0.2)' : 'rgba(239,68,68,0.2)'}`,
+          lineHeight: 1.4
+        }}>
+          {isInfoMessage ? 'ℹ️ ' : '⚠️ '}{displayError}
+        </div>
+      )}
+      <div className="exif-grid">
+        {fields.map(f => (
+          <div key={f.key} className="exif-field" style={f.key === 'camera' || f.key === 'lens' ? { gridColumn: 'span 2' } : {}}>
+            <label>{f.label}</label>
+            <input
+              value={exif[f.key]}
+              onChange={e => dispatch({ type: 'UPDATE_EXIF_FIELD', field: f.key, value: e.target.value })}
+              placeholder="-"
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Accordion ─────────────────────────────────────────────
+function Accordion({ title, defaultOpen, children }) {
+  const [open, setOpen] = useState(!!defaultOpen);
+  return (
+    <div className="accordion">
+      <button className={`accordion-header ${open ? 'open' : ''}`} onClick={() => setOpen(!open)}>
+        {title}
+        <span className="arrow">▼</span>
+      </button>
+      {open && <div className="accordion-body">{children}</div>}
+    </div>
+  );
+}
+
+// ─── Settings Panel ────────────────────────────────────────
+function SettingsPanel({ state, dispatch }) {
+  const { overlay, beforeAfter, exportSettings } = state;
+  const fonts = ['DM Sans', 'Outfit', 'Plus Jakarta Sans', 'Space Grotesk', 'JetBrains Mono', 'Playfair Display'];
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div className="section-title">Ayarlar</div>
+
+      {/* Crop */}
+      <Accordion title="Kırpma (Aspect Ratio)" defaultOpen>
+        <div className="ratio-group">
+          {['original', '1:1', '4:5', '16:9'].map(r => (
+            <button key={r} className={`ratio-btn ${exportSettings.aspectRatio === r ? 'active' : ''}`}
+              onClick={() => dispatch({ type: 'UPDATE_EXPORT', data: { aspectRatio: r } })}>
+              {r === 'original' ? 'Orijinal' : r}
+            </button>
+          ))}
+        </div>
+      </Accordion>
+
+      {/* Overlay */}
+      <Accordion title="EXIF Overlay Ayarları">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <label style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 500 }}>Metin Şablonu</label>
+          <textarea
+            value={overlay.textTemplate}
+            onChange={e => dispatch({ type: 'UPDATE_OVERLAY', data: { textTemplate: e.target.value } })}
+            style={{
+              width: '100%',
+              minHeight: 72,
+              background: 'var(--surface2)',
+              border: '1px solid var(--border)',
+              borderRadius: 8,
+              padding: '8px 10px',
+              color: 'var(--text)',
+              fontSize: 12,
+              fontFamily: "'JetBrains Mono', monospace",
+              outline: 'none',
+              resize: 'vertical',
+              lineHeight: 1.5
+            }}
+            placeholder="{camera}&#10;{lens}&#10;ISO {iso}  ·  {shutterSpeed}s  ·  {aperture}"
+          />
+          <div style={{ fontSize: 10, color: 'var(--text-muted)', opacity: 0.7, lineHeight: 1.5 }}>
+            Kullanılabilir: <code style={{ background: 'var(--surface2)', padding: '1px 4px', borderRadius: 4 }}>{'{camera}'}</code> <code style={{ background: 'var(--surface2)', padding: '1px 4px', borderRadius: 4 }}>{'{lens}'}</code> <code style={{ background: 'var(--surface2)', padding: '1px 4px', borderRadius: 4 }}>{'{iso}'}</code> <code style={{ background: 'var(--surface2)', padding: '1px 4px', borderRadius: 4 }}>{'{shutterSpeed}'}</code> <code style={{ background: 'var(--surface2)', padding: '1px 4px', borderRadius: 4 }}>{'{aperture}'}</code>
+            <br/>Her satır (\n) overlay'da ayrı satır olarak gösterilir. Değeri olmayan alanlar otomatik temizlenir.
+          </div>
+          <button
+            style={{
+              alignSelf: 'flex-start',
+              padding: '4px 10px',
+              border: '1px solid var(--border)',
+              borderRadius: 6,
+              background: 'var(--surface2)',
+              color: 'var(--text-muted)',
+              fontSize: 11,
+              fontFamily: 'var(--font)',
+              cursor: 'pointer'
+            }}
+            onClick={() => dispatch({ type: 'UPDATE_OVERLAY', data: { textTemplate: defaultSettings.overlay.textTemplate } })}
+          >
+            Varsayılana Sıfırla
+          </button>
+        </div>
+        <div className="control-row">
+          <label>Font</label>
+          <select value={overlay.fontFamily} onChange={e => dispatch({ type: 'UPDATE_OVERLAY', data: { fontFamily: e.target.value } })}>
+            {fonts.map(f => <option key={f} value={f}>{f}</option>)}
+          </select>
+        </div>
+        <div className="control-row">
+          <label>Font Boyutu</label>
+          <input type="range" min="16" max="192" value={overlay.fontSize} onChange={e => dispatch({ type: 'UPDATE_OVERLAY', data: { fontSize: +e.target.value } })} />
+          <span className="range-value">{overlay.fontSize}px</span>
+        </div>
+        <div className="control-row">
+          <label>Font Rengi</label>
+          <input type="color" value={overlay.fontColor} onChange={e => dispatch({ type: 'UPDATE_OVERLAY', data: { fontColor: e.target.value } })} />
+        </div>
+        <div className="control-row">
+          <label>Arka Plan Rengi</label>
+          <input type="color" value={overlay.bgColor} onChange={e => dispatch({ type: 'UPDATE_OVERLAY', data: { bgColor: e.target.value } })} />
+        </div>
+        <div className="control-row">
+          <label>Arka Plan Opaklığı</label>
+          <input type="range" min="0" max="100" value={Math.round(overlay.bgOpacity * 100)} onChange={e => dispatch({ type: 'UPDATE_OVERLAY', data: { bgOpacity: e.target.value / 100 } })} />
+          <span className="range-value">{Math.round(overlay.bgOpacity * 100)}%</span>
+        </div>
+        <div className="control-row">
+          <label>Blur</label>
+          <input type="range" min="0" max="200" value={overlay.blur} onChange={e => dispatch({ type: 'UPDATE_OVERLAY', data: { blur: +e.target.value } })} />
+          <span className="range-value">{overlay.blur}px</span>
+        </div>
+        <div className="control-row">
+          <label>Köşe Yuvarlaklığı</label>
+          <input type="range" min="0" max="200" value={overlay.borderRadius} onChange={e => dispatch({ type: 'UPDATE_OVERLAY', data: { borderRadius: +e.target.value } })} />
+          <span className="range-value">{overlay.borderRadius}px</span>
+        </div>
+        <div className="control-row">
+          <label>Dikey Konum</label>
+          <input type="range" min="5" max="95" value={overlay.verticalPosition} onChange={e => dispatch({ type: 'UPDATE_OVERLAY', data: { verticalPosition: +e.target.value } })} />
+          <span className="range-value">{overlay.verticalPosition}%</span>
+        </div>
+        <div className="control-row">
+          <label>Padding</label>
+          <input type="range" min="8" max="200" value={overlay.padding} onChange={e => dispatch({ type: 'UPDATE_OVERLAY', data: { padding: +e.target.value } })} />
+          <span className="range-value">{overlay.padding}px</span>
+        </div>
+      </Accordion>
+
+      {/* Before/After */}
+      <Accordion title="Before/After Ayarları">
+        <div className="control-row">
+          <label>Split Oranı</label>
+          <input type="range" min="10" max="90" value={beforeAfter.splitRatio} onChange={e => dispatch({ type: 'UPDATE_BEFORE_AFTER', data: { splitRatio: +e.target.value } })} />
+          <span className="range-value">{beforeAfter.splitRatio}%</span>
+        </div>
+        <div className="checkbox-row">
+          <input type="checkbox" id="divider" checked={beforeAfter.showDivider} onChange={e => dispatch({ type: 'UPDATE_BEFORE_AFTER', data: { showDivider: e.target.checked } })} />
+          <label htmlFor="divider">Ayırıcı Çizgi</label>
+        </div>
+        {beforeAfter.showDivider && (
+          <>
+            <div className="control-row">
+              <label>Ayırıcı Rengi</label>
+              <input type="color" value={beforeAfter.dividerColor} onChange={e => dispatch({ type: 'UPDATE_BEFORE_AFTER', data: { dividerColor: e.target.value } })} />
+            </div>
+            <div className="control-row">
+              <label>Ayırıcı Kalınlığı</label>
+              <input type="range" min="1" max="8" value={beforeAfter.dividerWidth} onChange={e => dispatch({ type: 'UPDATE_BEFORE_AFTER', data: { dividerWidth: +e.target.value } })} />
+              <span className="range-value">{beforeAfter.dividerWidth}px</span>
+            </div>
+          </>
+        )}
+        <div className="checkbox-row">
+          <input type="checkbox" id="labels" checked={beforeAfter.showLabels} onChange={e => dispatch({ type: 'UPDATE_BEFORE_AFTER', data: { showLabels: e.target.checked } })} />
+          <label htmlFor="labels">Etiketleri Göster</label>
+        </div>
+        {beforeAfter.showLabels && (
+          <>
+            <div className="control-row">
+              <label>Sol Etiket</label>
+              <input type="text" value={beforeAfter.beforeLabel}
+                onChange={e => dispatch({ type: 'UPDATE_BEFORE_AFTER', data: { beforeLabel: e.target.value } })}
+                style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 10px', color: 'var(--text)', fontSize: 12, fontFamily: 'var(--font)', outline: 'none', width: 120, textAlign: 'right' }}
+              />
+            </div>
+            <div className="control-row">
+              <label>Sağ Etiket</label>
+              <input type="text" value={beforeAfter.afterLabel}
+                onChange={e => dispatch({ type: 'UPDATE_BEFORE_AFTER', data: { afterLabel: e.target.value } })}
+                style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 10px', color: 'var(--text)', fontSize: 12, fontFamily: 'var(--font)', outline: 'none', width: 120, textAlign: 'right' }}
+              />
+            </div>
+            <div className="control-row">
+              <label>Font</label>
+              <select value={beforeAfter.labelFontFamily} onChange={e => dispatch({ type: 'UPDATE_BEFORE_AFTER', data: { labelFontFamily: e.target.value } })}>
+                {fonts.map(f => <option key={f} value={f}>{f}</option>)}
+              </select>
+            </div>
+            <div className="control-row">
+              <label>Font Boyutu</label>
+              <input type="range" min="0" max="192" value={beforeAfter.labelFontSize} onChange={e => dispatch({ type: 'UPDATE_BEFORE_AFTER', data: { labelFontSize: +e.target.value } })} />
+              <span className="range-value">{beforeAfter.labelFontSize === 0 ? 'Oto' : beforeAfter.labelFontSize + 'px'}</span>
+            </div>
+            <div className="control-row">
+              <label>Metin Rengi</label>
+              <input type="color" value={beforeAfter.labelTextColor} onChange={e => dispatch({ type: 'UPDATE_BEFORE_AFTER', data: { labelTextColor: e.target.value } })} />
+            </div>
+            <div className="control-row">
+              <label>Arka Plan Rengi</label>
+              <input type="color" value={beforeAfter.labelBgColor} onChange={e => dispatch({ type: 'UPDATE_BEFORE_AFTER', data: { labelBgColor: e.target.value } })} />
+            </div>
+            <div className="control-row">
+              <label>Arka Plan Opaklığı</label>
+              <input type="range" min="0" max="100" value={Math.round(beforeAfter.labelBgOpacity * 100)} onChange={e => dispatch({ type: 'UPDATE_BEFORE_AFTER', data: { labelBgOpacity: e.target.value / 100 } })} />
+              <span className="range-value">{Math.round(beforeAfter.labelBgOpacity * 100)}%</span>
+            </div>
+            <div className="control-row">
+              <label>Blur</label>
+              <input type="range" min="0" max="200" value={beforeAfter.labelBlur} onChange={e => dispatch({ type: 'UPDATE_BEFORE_AFTER', data: { labelBlur: +e.target.value } })} />
+              <span className="range-value">{beforeAfter.labelBlur}px</span>
+            </div>
+            <div className="control-row">
+              <label>Köşe Yuvarlaklığı</label>
+              <input type="range" min="0" max="200" value={beforeAfter.labelBorderRadius} onChange={e => dispatch({ type: 'UPDATE_BEFORE_AFTER', data: { labelBorderRadius: +e.target.value } })} />
+              <span className="range-value">{beforeAfter.labelBorderRadius}px</span>
+            </div>
+            <div className="control-row">
+              <label>Padding</label>
+              <input type="range" min="0" max="200" value={beforeAfter.labelPadding} onChange={e => dispatch({ type: 'UPDATE_BEFORE_AFTER', data: { labelPadding: +e.target.value } })} />
+              <span className="range-value">{beforeAfter.labelPadding === 0 ? 'Oto' : beforeAfter.labelPadding + 'px'}</span>
+            </div>
+            <div className="control-row">
+              <label>Dikey Konum</label>
+              <input type="range" min="5" max="95" value={beforeAfter.labelVerticalPosition} onChange={e => dispatch({ type: 'UPDATE_BEFORE_AFTER', data: { labelVerticalPosition: +e.target.value } })} />
+              <span className="range-value">{beforeAfter.labelVerticalPosition}%</span>
+            </div>
+          </>
+        )}
+      </Accordion>
+
+      {/* Export */}
+      <Accordion title="Dışa Aktarma">
+        <div className="control-row">
+          <label>Format</label>
+          <select value={exportSettings.format} onChange={e => dispatch({ type: 'UPDATE_EXPORT', data: { format: e.target.value } })}>
+            <option value="jpeg">JPEG</option>
+            <option value="png">PNG</option>
+          </select>
+        </div>
+        {exportSettings.format === 'jpeg' && (
+          <div className="control-row">
+            <label>Kalite</label>
+            <input type="range" min="50" max="100" value={exportSettings.jpegQuality} onChange={e => dispatch({ type: 'UPDATE_EXPORT', data: { jpegQuality: +e.target.value } })} />
+            <span className="range-value">{exportSettings.jpegQuality}%</span>
+          </div>
+        )}
+      </Accordion>
+    </div>
+  );
+}
+
+// ─── Preset Panel ──────────────────────────────────────────
+function PresetPanel({ state, dispatch }) {
+  const [presetName, setPresetName] = useState('');
+  const fileInputRef = useRef();
+  const presetNames = Object.keys(state.presets);
+
+  function handleSave() {
+    const name = presetName.trim();
+    if (!name) return;
+    dispatch({ type: 'SAVE_PRESET', name });
+    setPresetName('');
+  }
+
+  function handleImport(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const data = JSON.parse(ev.target.result);
+        if (!data.settings || !data.name) {
+          dispatch({ type: 'NOTIFY', message: 'Geçersiz preset dosyası.' });
+          return;
+        }
+        dispatch({ type: 'IMPORT_PRESET', name: data.name, settings: data.settings });
+      } catch {
+        dispatch({ type: 'NOTIFY', message: 'Preset dosyası okunamadı.' });
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  }
+
+  function handleExportExisting(name) {
+    const p = state.presets[name];
+    if (!p) return;
+    const { savedAt, ...settings } = p;
+    downloadPresetFile(name, settings);
+    dispatch({ type: 'NOTIFY', message: `"${name}" dosya olarak indirildi` });
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div className="section-title">Presetler</div>
+
+      {/* Save */}
+      <div className="template-save-row">
+        <input
+          placeholder="Preset adı..."
+          value={presetName}
+          onChange={e => setPresetName(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && handleSave()}
+        />
+        <button disabled={!presetName.trim()} onClick={handleSave}>Kaydet</button>
+      </div>
+
+      {/* Import */}
+      <input ref={fileInputRef} type="file" accept=".json" hidden onChange={handleImport} />
+      <button
+        onClick={() => fileInputRef.current.click()}
+        style={{
+          width: '100%',
+          padding: '8px 14px',
+          border: '1px dashed var(--border)',
+          borderRadius: 8,
+          background: 'transparent',
+          color: 'var(--text-muted)',
+          fontSize: 12,
+          fontWeight: 600,
+          fontFamily: 'var(--font)',
+          cursor: 'pointer',
+          transition: 'all 0.2s'
+        }}
+      >
+        📂 Dosyadan İçe Aktar (.json)
+      </button>
+
+      {/* List */}
+      <div className="template-list">
+        {presetNames.length === 0 && (
+          <div className="template-empty">Henüz kaydedilmiş preset yok</div>
+        )}
+        {presetNames.map(name => (
+          <div key={name} className="template-item">
+            <div
+              className="template-item-name"
+              onClick={() => dispatch({ type: 'LOAD_PRESET', name })}
+              title="Tıkla: Preseti uygula"
+            >
+              {name}
+            </div>
+            <button
+              onClick={() => handleExportExisting(name)}
+              title="Dosya olarak indir"
+              style={{
+                width: 22, height: 22, border: 'none', borderRadius: 6,
+                background: 'rgba(249,115,22,0.15)', color: 'var(--accent1)',
+                fontSize: 12, cursor: 'pointer', display: 'flex',
+                alignItems: 'center', justifyContent: 'center', flexShrink: 0
+              }}
+            >
+              ⬇
+            </button>
+            <button
+              className="template-item-delete"
+              onClick={() => dispatch({ type: 'DELETE_PRESET', name })}
+              title="Preseti sil"
+            >
+              ×
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Canvas Preview ────────────────────────────────────────
+function CanvasPreview({ state, canvasRef }) {
+  const rafRef = useRef(null);
+  const timerRef = useRef(null);
+
+  const render = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const { activeTab, editedImage, uneditedImage, exif, overlay, beforeAfter, exportSettings } = state;
+
+    const mainImg = editedImage || uneditedImage;
+    if (!mainImg) return;
+
+    const crop = getCropRect(mainImg.naturalWidth, mainImg.naturalHeight, exportSettings.aspectRatio);
+    canvas.width = crop.sw;
+    canvas.height = crop.sh;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    if (activeTab === 'overlay') {
+      ctx.drawImage(mainImg, crop.sx, crop.sy, crop.sw, crop.sh, 0, 0, crop.sw, crop.sh);
+
+      // Build text lines from template
+      const templateStr = overlay.textTemplate || '{camera}\n{lens}\nISO {iso}  ·  {shutterSpeed}s  ·  {aperture}';
+      const replacements = {
+        camera: exif.camera || '',
+        lens: exif.lens || '',
+        iso: exif.iso || '',
+        shutterSpeed: exif.shutterSpeed || '',
+        aperture: exif.aperture || ''
+      };
+      const rawLines = templateStr.split('\n').map(line => {
+        let result = line;
+        for (const [key, val] of Object.entries(replacements)) {
+          result = result.replace(new RegExp('\\{' + key + '\\}', 'g'), val);
+        }
+        // Clean up leftover separators when values are empty
+        result = result.replace(/\s*·\s*·\s*/g, '  ·  ').replace(/^\s*·\s*/, '').replace(/\s*·\s*$/, '').trim();
+        return result;
+      }).filter(line => line.length > 0);
+      const lines = rawLines.length > 0 ? rawLines : ['EXIF bilgisi yok'];
+
+      const fontSize = overlay.fontSize;
+      const fontStr = `${fontSize}px '${overlay.fontFamily}', sans-serif`;
+      ctx.font = fontStr;
+      const lineHeight = fontSize * 1.5;
+      const pad = overlay.padding;
+
+      // Measure text
+      let maxTextW = 0;
+      for (const line of lines) {
+        const w = ctx.measureText(line).width;
+        if (w > maxTextW) maxTextW = w;
+      }
+
+      const boxW = maxTextW + pad * 2;
+      const boxH = lines.length * lineHeight + pad * 2 - (lineHeight - fontSize);
+      const boxX = (canvas.width - boxW) / 2;
+      const boxY = canvas.height * (overlay.verticalPosition / 100) - boxH / 2;
+
+      // Glassmorphism: blur background behind box
+      ctx.save();
+      roundRect(ctx, boxX, boxY, boxW, boxH, overlay.borderRadius);
+      ctx.clip();
+
+      if (overlay.blur > 0) {
+        ctx.filter = `blur(${overlay.blur}px)`;
+        ctx.drawImage(mainImg, crop.sx, crop.sy, crop.sw, crop.sh, 0, 0, crop.sw, crop.sh);
+        ctx.filter = 'none';
+      }
+
+      // Semi-transparent bg
+      const r = parseInt(overlay.bgColor.slice(1,3), 16);
+      const g = parseInt(overlay.bgColor.slice(3,5), 16);
+      const b = parseInt(overlay.bgColor.slice(5,7), 16);
+      ctx.fillStyle = `rgba(${r},${g},${b},${overlay.bgOpacity})`;
+      ctx.fillRect(boxX, boxY, boxW, boxH);
+
+      // Border
+      ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+      ctx.lineWidth = 1;
+      roundRect(ctx, boxX, boxY, boxW, boxH, overlay.borderRadius);
+      ctx.stroke();
+
+      ctx.restore();
+
+      // Text
+      ctx.font = fontStr;
+      ctx.fillStyle = overlay.fontColor;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+
+      const textStartY = boxY + pad;
+      lines.forEach((line, i) => {
+        ctx.fillText(line, canvas.width / 2, textStartY + i * lineHeight);
+      });
+    }
+
+    else if (activeTab === 'beforeafter') {
+      const hasUnedited = !!uneditedImage;
+      const hasEdited = !!editedImage;
+      if (!hasUnedited && !hasEdited) return;
+
+      const leftImg = uneditedImage || editedImage;
+      const rightImg = editedImage || uneditedImage;
+      const leftCrop = getCropRect(leftImg.naturalWidth, leftImg.naturalHeight, exportSettings.aspectRatio);
+      const rightCrop = getCropRect(rightImg.naturalWidth, rightImg.naturalHeight, exportSettings.aspectRatio);
+
+      // Use edited image dimensions for canvas
+      canvas.width = rightCrop.sw;
+      canvas.height = rightCrop.sh;
+
+      const splitX = Math.round(canvas.width * (beforeAfter.splitRatio / 100));
+
+      // Left side
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(0, 0, splitX, canvas.height);
+      ctx.clip();
+      // Scale left image to fill canvas
+      ctx.drawImage(leftImg, leftCrop.sx, leftCrop.sy, leftCrop.sw, leftCrop.sh, 0, 0, canvas.width, canvas.height);
+      ctx.restore();
+
+      // Right side
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(splitX, 0, canvas.width - splitX, canvas.height);
+      ctx.clip();
+      ctx.drawImage(rightImg, rightCrop.sx, rightCrop.sy, rightCrop.sw, rightCrop.sh, 0, 0, canvas.width, canvas.height);
+      ctx.restore();
+
+      // Divider
+      if (beforeAfter.showDivider) {
+        ctx.beginPath();
+        ctx.moveTo(splitX, 0);
+        ctx.lineTo(splitX, canvas.height);
+        ctx.strokeStyle = beforeAfter.dividerColor;
+        ctx.lineWidth = beforeAfter.dividerWidth;
+        ctx.stroke();
+      }
+
+      // Labels
+      if (beforeAfter.showLabels) {
+        const labelFontSize = beforeAfter.labelFontSize > 0 ? beforeAfter.labelFontSize : Math.max(18, Math.round(canvas.height * 0.03));
+        const labelFontFamily = beforeAfter.labelFontFamily || 'DM Sans';
+        ctx.font = `700 ${labelFontSize}px '${labelFontFamily}', sans-serif`;
+        const labelPadX = beforeAfter.labelPadding > 0 ? beforeAfter.labelPadding : labelFontSize * 0.8;
+        const labelPadY = beforeAfter.labelPadding > 0 ? beforeAfter.labelPadding * 0.5 : labelFontSize * 0.4;
+        const labelRadius = beforeAfter.labelBorderRadius != null ? beforeAfter.labelBorderRadius : 8;
+
+        // Label bg color with opacity
+        const lbr = parseInt((beforeAfter.labelBgColor || '#000000').slice(1,3), 16);
+        const lbg = parseInt((beforeAfter.labelBgColor || '#000000').slice(3,5), 16);
+        const lbb = parseInt((beforeAfter.labelBgColor || '#000000').slice(5,7), 16);
+        const lbgOpacity = beforeAfter.labelBgOpacity != null ? beforeAfter.labelBgOpacity : 0.55;
+        const lbgStyle = `rgba(${lbr},${lbg},${lbb},${lbgOpacity})`;
+        const labelColor = beforeAfter.labelTextColor || '#ffffff';
+        const labelBlur = beforeAfter.labelBlur || 0;
+
+        // Vertical position
+        const labelCenterY = canvas.height * ((beforeAfter.labelVerticalPosition || 90) / 100);
+
+        // Helper to draw a single label with glassmorphism
+        function drawLabel(text, align, anchorX) {
+          if (!text) return;
+          ctx.font = `700 ${labelFontSize}px '${labelFontFamily}', sans-serif`;
+          const tm = ctx.measureText(text);
+          const boxW = tm.width + labelPadX * 2;
+          const boxH = labelFontSize + labelPadY * 2;
+          const boxX = align === 'left' ? anchorX - labelPadX : anchorX - tm.width - labelPadX;
+          const boxY = labelCenterY - boxH / 2;
+
+          // Glassmorphism: clip, blur, fill bg
+          ctx.save();
+          roundRect(ctx, boxX, boxY, boxW, boxH, labelRadius);
+          ctx.clip();
+
+          if (labelBlur > 0) {
+            ctx.filter = `blur(${labelBlur}px)`;
+            // Re-draw both sides behind the label for blur source
+            const lImg = uneditedImage || editedImage;
+            const rImg = editedImage || uneditedImage;
+            const lC = getCropRect(lImg.naturalWidth, lImg.naturalHeight, exportSettings.aspectRatio);
+            const rC = getCropRect(rImg.naturalWidth, rImg.naturalHeight, exportSettings.aspectRatio);
+            ctx.drawImage(lImg, lC.sx, lC.sy, lC.sw, lC.sh, 0, 0, canvas.width, canvas.height);
+            ctx.drawImage(rImg, rC.sx, rC.sy, rC.sw, rC.sh, splitX, 0, canvas.width - splitX, canvas.height);
+            ctx.filter = 'none';
+          }
+
+          // Semi-transparent bg
+          ctx.fillStyle = lbgStyle;
+          ctx.fillRect(boxX, boxY, boxW, boxH);
+
+          // Border
+          ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+          ctx.lineWidth = 1;
+          roundRect(ctx, boxX, boxY, boxW, boxH, labelRadius);
+          ctx.stroke();
+
+          ctx.restore();
+
+          // Text
+          ctx.font = `700 ${labelFontSize}px '${labelFontFamily}', sans-serif`;
+          ctx.fillStyle = labelColor;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(text, boxX + boxW / 2, boxY + boxH / 2);
+        }
+
+        // BEFORE label (left)
+        const beforeText = beforeAfter.beforeLabel || 'BEFORE';
+        drawLabel(beforeText, 'left', labelFontSize);
+
+        // AFTER label (right)
+        const afterText = beforeAfter.afterLabel || 'AFTER';
+        drawLabel(afterText, 'right', canvas.width - labelFontSize);
+      }
+    }
+  }, [state]);
+
+  useEffect(() => {
+    clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      rafRef.current = requestAnimationFrame(render);
+    }, 50);
+    return () => {
+      clearTimeout(timerRef.current);
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
+  }, [render]);
+
+  const hasImage = state.editedImage || state.uneditedImage;
+
+  if (!hasImage) {
+    return (
+      <div className="canvas-wrapper">
+        <div className="canvas-placeholder">
+          <div className="icon">🖼</div>
+          <p>Başlamak için bir fotoğraf yükleyin</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="canvas-wrapper">
+      <canvas ref={canvasRef} />
+    </div>
+  );
+}
+
+// ─── App ───────────────────────────────────────────────────
+function App() {
+  const [state, dispatch] = useReducer(reducer, initialState);
+  const canvasRef = useRef(null);
+
+  // Persist settings to localStorage
+  useEffect(() => {
+    saveSettings(state);
+  }, [state.overlay, state.beforeAfter, state.exportSettings]);
+
+  // EXIF reading
+  async function handleUneditedFile(file) {
+    try {
+      const { image, thumb } = await loadImage(file);
+      dispatch({ type: 'SET_UNEDITED', file, image, thumb });
+      dispatch({ type: 'SET_EXIF_LOADING' });
+      try {
+        const exifData = await parseExif(file);
+        dispatch({ type: 'SET_EXIF', data: exifData });
+        if (exifData._empty) {
+          dispatch({ type: 'SET_EXIF_ERROR', error: 'info:Bu fotoğrafta EXIF verisi bulunamadı — bilgileri manuel olarak girebilirsiniz.' });
+        }
+      } catch (err) {
+        dispatch({ type: 'SET_EXIF_ERROR', error: err.message || 'EXIF verisi okunamadı — bilgileri manuel olarak girebilirsiniz.' });
+      }
+    } catch (err) {
+      dispatch({ type: 'NOTIFY', message: 'Görsel yüklenemedi.' });
+    }
+  }
+
+  async function handleEditedFile(file) {
+    try {
+      const { image, thumb } = await loadImage(file);
+      dispatch({ type: 'SET_EDITED', file, image, thumb });
+    } catch {
+      dispatch({ type: 'NOTIFY', message: 'Görsel yüklenemedi.' });
+    }
+  }
+
+  function handleDownload() {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const { format, jpegQuality } = state.exportSettings;
+    const mime = format === 'png' ? 'image/png' : 'image/jpeg';
+    const quality = format === 'jpeg' ? jpegQuality / 100 : undefined;
+    const dataUrl = canvas.toDataURL(mime, quality);
+    const a = document.createElement('a');
+    const tabName = state.activeTab === 'overlay' ? 'exif_overlay' : 'before_after';
+    a.download = `instagram_${tabName}_${Date.now()}.${format === 'png' ? 'png' : 'jpg'}`;
+    a.href = dataUrl;
+    a.click();
+    dispatch({ type: 'NOTIFY', message: 'Fotoğraf indirildi!' });
+  }
+
+  // Clear notification
+  useEffect(() => {
+    if (state.notification) {
+      const t = setTimeout(() => dispatch({ type: 'CLEAR_NOTIFY' }), 3000);
+      return () => clearTimeout(t);
+    }
+  }, [state.notification]);
+
+  const hasImage = !!(state.editedImage || state.uneditedImage);
+  const hasBoth = !!(state.editedImage && state.uneditedImage);
+
+  const canShowTab = {
+    overlay: hasImage,
+    beforeafter: hasBoth
+  };
+
+  return (
+    <div className="app-container">
+      <div className="sidebar">
+        {/* Header */}
+        <div className="header">
+          <div className="header-logo">📷</div>
+          <div>
+            <h1>InstaPrep</h1>
+            <p>Fotoğraf Hazırlama Aracı</p>
+          </div>
+        </div>
+
+        {/* Upload */}
+        <div>
+          <div className="section-title">Fotoğraflar</div>
+          <div className="dropzone-row">
+            <DropZone
+              label="Editlenmemiş"
+              thumb={state.uneditedThumb}
+              onFile={handleUneditedFile}
+              onRemove={() => dispatch({ type: 'REMOVE_UNEDITED' })}
+            />
+            <DropZone
+              label="Editlenmiş"
+              thumb={state.editedThumb}
+              onFile={handleEditedFile}
+              onRemove={() => dispatch({ type: 'REMOVE_EDITED' })}
+            />
+          </div>
+        </div>
+
+        {/* EXIF */}
+        <ExifDisplay exif={state.exif} exifLoading={state.exifLoading} exifError={state.exifError} dispatch={dispatch} />
+
+        {/* Settings */}
+        <SettingsPanel state={state} dispatch={dispatch} />
+
+        {/* Presets */}
+        <PresetPanel state={state} dispatch={dispatch} />
+      </div>
+
+      <div className="main-area">
+        {/* Tabs */}
+        <div className="tab-bar">
+          <button className={`tab-btn ${state.activeTab === 'overlay' ? 'active' : ''}`}
+            disabled={!canShowTab.overlay}
+            onClick={() => dispatch({ type: 'SET_TAB', tab: 'overlay' })}>
+            EXIF Overlay
+          </button>
+          <button className={`tab-btn ${state.activeTab === 'beforeafter' ? 'active' : ''}`}
+            disabled={!canShowTab.beforeafter}
+            onClick={() => dispatch({ type: 'SET_TAB', tab: 'beforeafter' })}>
+            Before / After
+          </button>
+        </div>
+
+        {/* Canvas */}
+        <CanvasPreview state={state} canvasRef={canvasRef} />
+
+        {/* Download */}
+        <button className="download-btn" disabled={!hasImage} onClick={handleDownload}>
+          ⬇ İndir ({state.exportSettings.format.toUpperCase()})
+        </button>
+      </div>
+
+      {/* Notification */}
+      {state.notification && <div className="notification">{state.notification}</div>}
+    </div>
+  );
+}
+
+// ─── Mount ─────────────────────────────────────────────────
+const root = ReactDOM.createRoot(document.getElementById('root'));
+document.fonts.ready.then(() => {
+  root.render(<App />);
+});
+</script>
+</body>
+</html>
