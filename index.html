@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Instagram Fotoğraf Hazırlama Aracı</title>
+<title>InstaPrep</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Playfair+Display:wght@400;500;600;700&display=swap" rel="stylesheet" />
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -26,6 +26,15 @@
   --font: 'DM Sans', sans-serif;
 }
 
+[data-theme="light"] {
+  --bg: #f5f5f5;
+  --surface: #ffffff;
+  --surface2: #eaeaea;
+  --border: rgba(0,0,0,0.1);
+  --text: #1a1a1a;
+  --text-muted: #666;
+}
+
 body {
   background: var(--bg);
   color: var(--text);
@@ -38,6 +47,7 @@ body {
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+[data-theme="light"] ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); }
 
 /* Glass card */
 .glass {
@@ -616,13 +626,200 @@ body {
     max-height: 60vh;
   }
 }
+
+/* Toggle Switch */
+.toggle-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface2);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--font);
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.toggle-btn:hover {
+  border-color: var(--accent1);
+  color: var(--text);
+}
+
+.toggle-btn .toggle-icon {
+  font-size: 14px;
+  line-height: 1;
+}
 </style>
 </head>
 <body>
 <div id="root"></div>
 
 <script type="text/babel">
-const { useState, useReducer, useRef, useEffect, useCallback, useMemo } = React;
+const { useState, useReducer, useRef, useEffect, useCallback, useMemo, createContext, useContext } = React;
+
+// ─── i18n ──────────────────────────────────────────────────
+const translations = {
+  tr: {
+    subtitle: 'Fotoğraf Hazırlama Aracı',
+    photos: 'Fotoğraflar',
+    unedited: 'Editlenmemiş',
+    edited: 'Editlenmiş',
+    dragOrClick: 'Sürükle veya tıkla',
+    exifInfo: 'EXIF Bilgileri',
+    exifReading: 'EXIF okunuyor...',
+    exifNotFound: 'Bu fotoğrafta EXIF verisi bulunamadı — bilgileri manuel olarak girebilirsiniz.',
+    exifReadError: 'EXIF verisi okunamadı — bilgileri manuel olarak girebilirsiniz.',
+    camera: 'Kamera',
+    lens: 'Lens',
+    iso: 'ISO',
+    shutter: 'Enstantane',
+    aperture: 'Diyafram',
+    settings: 'Ayarlar',
+    crop: 'Kırpma (Aspect Ratio)',
+    original: 'Orijinal',
+    overlaySettings: 'EXIF Overlay Ayarları',
+    textTemplate: 'Metin Şablonu',
+    templateHelp: 'Her satır (\\n) overlay\'da ayrı satır olarak gösterilir. Değeri olmayan alanlar otomatik temizlenir.',
+    templateVars: 'Kullanılabilir:',
+    resetDefault: 'Varsayılana Sıfırla',
+    font: 'Font',
+    fontSize: 'Font Boyutu',
+    fontColor: 'Font Rengi',
+    bgColor: 'Arka Plan Rengi',
+    bgOpacity: 'Arka Plan Opaklığı',
+    blur: 'Blur',
+    borderRadius: 'Köşe Yuvarlaklığı',
+    verticalPos: 'Dikey Konum',
+    padding: 'Padding',
+    baSettings: 'Before/After Ayarları',
+    splitRatio: 'Split Oranı',
+    dividerLine: 'Ayırıcı Çizgi',
+    dividerColor: 'Ayırıcı Rengi',
+    dividerWidth: 'Ayırıcı Kalınlığı',
+    showLabels: 'Etiketleri Göster',
+    leftLabel: 'Sol Etiket',
+    rightLabel: 'Sağ Etiket',
+    textColor: 'Metin Rengi',
+    auto: 'Oto',
+    exportTitle: 'Dışa Aktarma',
+    quality: 'Kalite',
+    presets: 'Presetler',
+    presetName: 'Preset adı...',
+    save: 'Kaydet',
+    importFile: '📂 Dosyadan İçe Aktar (.json)',
+    noPresets: 'Henüz kaydedilmiş preset yok',
+    presetSaved: 'preset kaydedildi',
+    presetLoaded: 'preset yüklendi',
+    presetDeleted: 'preset silindi',
+    presetImported: 'preset içe aktarıldı ve uygulandı',
+    presetDownloaded: 'dosya olarak indirildi',
+    invalidPreset: 'Geçersiz preset dosyası.',
+    presetReadError: 'Preset dosyası okunamadı.',
+    clickApply: 'Tıkla: Preseti uygula',
+    downloadFile: 'Dosya olarak indir',
+    deletePreset: 'Preseti sil',
+    exifOverlay: 'EXIF Overlay',
+    beforeAfter: 'Before / After',
+    download: 'İndir',
+    photoDownloaded: 'Fotoğraf indirildi!',
+    uploadToStart: 'Başlamak için bir fotoğraf yükleyin',
+    imageLoadError: 'Görsel yüklenemedi.',
+    noExifInfo: 'EXIF bilgisi yok',
+    templateSaved: 'kaydedildi',
+    templateLoaded: 'yüklendi',
+    templateDeleted: 'silindi'
+  },
+  en: {
+    subtitle: 'Photo Preparation Tool',
+    photos: 'Photos',
+    unedited: 'Unedited',
+    edited: 'Edited',
+    dragOrClick: 'Drag or click',
+    exifInfo: 'EXIF Information',
+    exifReading: 'Reading EXIF...',
+    exifNotFound: 'No EXIF data found in this photo — you can enter the info manually.',
+    exifReadError: 'Could not read EXIF data — you can enter the info manually.',
+    exifReadErrorDetail: 'Could not read EXIF: ',
+    camera: 'Camera',
+    lens: 'Lens',
+    iso: 'ISO',
+    shutter: 'Shutter Speed',
+    aperture: 'Aperture',
+    settings: 'Settings',
+    crop: 'Crop (Aspect Ratio)',
+    original: 'Original',
+    overlaySettings: 'EXIF Overlay Settings',
+    textTemplate: 'Text Template',
+    templateHelp: 'Each line (\\n) is shown as a separate line on the overlay. Empty fields are cleaned up automatically.',
+    templateVars: 'Available:',
+    resetDefault: 'Reset to Default',
+    font: 'Font',
+    fontSize: 'Font Size',
+    fontColor: 'Font Color',
+    bgColor: 'Background Color',
+    bgOpacity: 'Background Opacity',
+    blur: 'Blur',
+    borderRadius: 'Border Radius',
+    verticalPos: 'Vertical Position',
+    padding: 'Padding',
+    baSettings: 'Before/After Settings',
+    splitRatio: 'Split Ratio',
+    dividerLine: 'Divider Line',
+    dividerColor: 'Divider Color',
+    dividerWidth: 'Divider Width',
+    showLabels: 'Show Labels',
+    leftLabel: 'Left Label',
+    rightLabel: 'Right Label',
+    textColor: 'Text Color',
+    auto: 'Auto',
+    exportTitle: 'Export',
+    quality: 'Quality',
+    presets: 'Presets',
+    presetName: 'Preset name...',
+    save: 'Save',
+    importFile: '📂 Import from File (.json)',
+    noPresets: 'No presets saved yet',
+    presetSaved: 'preset saved',
+    presetLoaded: 'preset loaded',
+    presetDeleted: 'preset deleted',
+    presetImported: 'preset imported and applied',
+    presetDownloaded: 'downloaded as file',
+    invalidPreset: 'Invalid preset file.',
+    presetReadError: 'Could not read preset file.',
+    clickApply: 'Click: Apply preset',
+    downloadFile: 'Download as file',
+    deletePreset: 'Delete preset',
+    exifOverlay: 'EXIF Overlay',
+    beforeAfter: 'Before / After',
+    download: 'Download',
+    photoDownloaded: 'Photo downloaded!',
+    uploadToStart: 'Upload a photo to get started',
+    imageLoadError: 'Could not load image.',
+    noExifInfo: 'No EXIF info',
+    templateSaved: 'saved',
+    templateLoaded: 'loaded',
+    templateDeleted: 'deleted'
+  }
+};
+
+const LangContext = createContext('tr');
+const ThemeContext = createContext('dark');
+
+function useT() {
+  const lang = useContext(LangContext);
+  return (key) => translations[lang]?.[key] || translations.tr[key] || key;
+}
 
 // ─── LocalStorage Helpers ──────────────────────────────────
 const STORAGE_KEY = 'instaprep_settings';
@@ -782,7 +979,7 @@ function reducer(state, action) {
       if (!newTemplates[action.orientation]) newTemplates[action.orientation] = {};
       newTemplates[action.orientation][action.name] = extractSettingsForTemplate(state);
       saveTemplates(newTemplates);
-      return { ...state, templates: newTemplates, notification: `"${action.name}" (${action.orientation}) kaydedildi` };
+      return { ...state, templates: newTemplates, notification: { key: 'templateSaved', name: `${action.name} (${action.orientation})` } };
     }
     case 'LOAD_TEMPLATE': {
       const tpl = state.templates[action.orientation]?.[action.name];
@@ -792,7 +989,7 @@ function reducer(state, action) {
         overlay: { ...defaultSettings.overlay, ...tpl.overlay },
         beforeAfter: { ...defaultSettings.beforeAfter, ...tpl.beforeAfter },
         exportSettings: { ...defaultSettings.exportSettings, ...tpl.exportSettings },
-        notification: `"${action.name}" (${action.orientation}) yüklendi`
+        notification: { key: 'templateLoaded', name: `${action.name} (${action.orientation})` }
       };
     }
     case 'DELETE_TEMPLATE': {
@@ -803,13 +1000,13 @@ function reducer(state, action) {
         newTemplates[action.orientation] = copy;
       }
       saveTemplates(newTemplates);
-      return { ...state, templates: newTemplates, notification: `"${action.name}" silindi` };
+      return { ...state, templates: newTemplates, notification: { key: 'templateDeleted', name: action.name } };
     }
     case 'SAVE_PRESET': {
       const settings = extractSettingsForTemplate(state);
       const newPresets = { ...state.presets, [action.name]: { ...settings, savedAt: new Date().toISOString() } };
       savePresetsToStorage(newPresets);
-      return { ...state, presets: newPresets, notification: `"${action.name}" preset kaydedildi` };
+      return { ...state, presets: newPresets, notification: { key: 'presetSaved', name: action.name } };
     }
     case 'LOAD_PRESET': {
       const p = state.presets[action.name];
@@ -819,14 +1016,14 @@ function reducer(state, action) {
         overlay: { ...defaultSettings.overlay, ...p.overlay },
         beforeAfter: { ...defaultSettings.beforeAfter, ...p.beforeAfter },
         exportSettings: { ...defaultSettings.exportSettings, ...p.exportSettings },
-        notification: `"${action.name}" preset yüklendi`
+        notification: { key: 'presetLoaded', name: action.name }
       };
     }
     case 'DELETE_PRESET': {
       const newPresets = { ...state.presets };
       delete newPresets[action.name];
       savePresetsToStorage(newPresets);
-      return { ...state, presets: newPresets, notification: `"${action.name}" preset silindi` };
+      return { ...state, presets: newPresets, notification: { key: 'presetDeleted', name: action.name } };
     }
     case 'IMPORT_PRESET': {
       const { name, settings } = action;
@@ -838,7 +1035,7 @@ function reducer(state, action) {
         overlay: { ...defaultSettings.overlay, ...settings.overlay },
         beforeAfter: { ...defaultSettings.beforeAfter, ...settings.beforeAfter },
         exportSettings: { ...defaultSettings.exportSettings, ...settings.exportSettings },
-        notification: `"${name}" preset içe aktarıldı ve uygulandı`
+        notification: { key: 'presetImported', name }
       };
     }
     case 'NOTIFY':
@@ -871,7 +1068,7 @@ async function parseExif(file) {
     try {
       data = await exifr.parse(file, { tiff: true, exif: true, ifd1: true, xmp: true, iptc: true });
     } catch (e2) {
-      throw new Error('EXIF verisi okunamadı: ' + (e2.message || 'bilinmeyen hata'));
+      throw new Error('EXIF read error: ' + (e2.message || 'unknown'));
     }
   }
 
@@ -936,6 +1133,7 @@ function roundRect(ctx, x, y, w, h, r) {
 function DropZone({ label, thumb, onFile, onRemove }) {
   const [dragOver, setDragOver] = useState(false);
   const inputRef = useRef();
+  const t = useT();
 
   function handleDrop(e) {
     e.preventDefault();
@@ -968,7 +1166,7 @@ function DropZone({ label, thumb, onFile, onRemove }) {
         <>
           <div className="icon">+</div>
           <div className="label">{label}</div>
-          <div className="sublabel">Sürükle veya tıkla</div>
+          <div className="sublabel">{t('dragOrClick')}</div>
         </>
       )}
     </div>
@@ -977,12 +1175,13 @@ function DropZone({ label, thumb, onFile, onRemove }) {
 
 // ─── EXIF Display ──────────────────────────────────────────
 function ExifDisplay({ exif, exifLoading, exifError, dispatch }) {
+  const t = useT();
   const fields = [
-    { key: 'camera', label: 'Kamera' },
-    { key: 'lens', label: 'Lens' },
-    { key: 'iso', label: 'ISO' },
-    { key: 'shutterSpeed', label: 'Enstantane' },
-    { key: 'aperture', label: 'Diyafram' }
+    { key: 'camera', label: t('camera') },
+    { key: 'lens', label: t('lens') },
+    { key: 'iso', label: t('iso') },
+    { key: 'shutterSpeed', label: t('shutter') },
+    { key: 'aperture', label: t('aperture') }
   ];
 
   const isInfoMessage = exifError && exifError.startsWith('info:');
@@ -990,8 +1189,8 @@ function ExifDisplay({ exif, exifLoading, exifError, dispatch }) {
 
   return (
     <div>
-      <div className="section-title">EXIF Bilgileri</div>
-      {exifLoading && <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>EXIF okunuyor...</div>}
+      <div className="section-title">{t('exifInfo')}</div>
+      {exifLoading && <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t('exifReading')}</div>}
       {displayError && (
         <div style={{
           fontSize: 12,
@@ -1040,27 +1239,28 @@ function Accordion({ title, defaultOpen, children }) {
 function SettingsPanel({ state, dispatch }) {
   const { overlay, beforeAfter, exportSettings } = state;
   const fonts = ['DM Sans', 'Outfit', 'Plus Jakarta Sans', 'Space Grotesk', 'JetBrains Mono', 'Playfair Display'];
+  const t = useT();
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <div className="section-title">Ayarlar</div>
+      <div className="section-title">{t('settings')}</div>
 
       {/* Crop */}
-      <Accordion title="Kırpma (Aspect Ratio)" defaultOpen>
+      <Accordion title={t('crop')} defaultOpen>
         <div className="ratio-group">
           {['original', '1:1', '4:5', '16:9'].map(r => (
             <button key={r} className={`ratio-btn ${exportSettings.aspectRatio === r ? 'active' : ''}`}
               onClick={() => dispatch({ type: 'UPDATE_EXPORT', data: { aspectRatio: r } })}>
-              {r === 'original' ? 'Orijinal' : r}
+              {r === 'original' ? t('original') : r}
             </button>
           ))}
         </div>
       </Accordion>
 
       {/* Overlay */}
-      <Accordion title="EXIF Overlay Ayarları">
+      <Accordion title={t('overlaySettings')}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <label style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 500 }}>Metin Şablonu</label>
+          <label style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 500 }}>{t('textTemplate')}</label>
           <textarea
             value={overlay.textTemplate}
             onChange={e => dispatch({ type: 'UPDATE_OVERLAY', data: { textTemplate: e.target.value } })}
@@ -1081,8 +1281,8 @@ function SettingsPanel({ state, dispatch }) {
             placeholder="{camera}&#10;{lens}&#10;ISO {iso}  ·  {shutterSpeed}s  ·  {aperture}"
           />
           <div style={{ fontSize: 10, color: 'var(--text-muted)', opacity: 0.7, lineHeight: 1.5 }}>
-            Kullanılabilir: <code style={{ background: 'var(--surface2)', padding: '1px 4px', borderRadius: 4 }}>{'{camera}'}</code> <code style={{ background: 'var(--surface2)', padding: '1px 4px', borderRadius: 4 }}>{'{lens}'}</code> <code style={{ background: 'var(--surface2)', padding: '1px 4px', borderRadius: 4 }}>{'{iso}'}</code> <code style={{ background: 'var(--surface2)', padding: '1px 4px', borderRadius: 4 }}>{'{shutterSpeed}'}</code> <code style={{ background: 'var(--surface2)', padding: '1px 4px', borderRadius: 4 }}>{'{aperture}'}</code>
-            <br/>Her satır (\n) overlay'da ayrı satır olarak gösterilir. Değeri olmayan alanlar otomatik temizlenir.
+            {t('templateVars')} <code style={{ background: 'var(--surface2)', padding: '1px 4px', borderRadius: 4 }}>{'{camera}'}</code> <code style={{ background: 'var(--surface2)', padding: '1px 4px', borderRadius: 4 }}>{'{lens}'}</code> <code style={{ background: 'var(--surface2)', padding: '1px 4px', borderRadius: 4 }}>{'{iso}'}</code> <code style={{ background: 'var(--surface2)', padding: '1px 4px', borderRadius: 4 }}>{'{shutterSpeed}'}</code> <code style={{ background: 'var(--surface2)', padding: '1px 4px', borderRadius: 4 }}>{'{aperture}'}</code>
+            <br/>{t('templateHelp')}
           </div>
           <button
             style={{
@@ -1098,74 +1298,74 @@ function SettingsPanel({ state, dispatch }) {
             }}
             onClick={() => dispatch({ type: 'UPDATE_OVERLAY', data: { textTemplate: defaultSettings.overlay.textTemplate } })}
           >
-            Varsayılana Sıfırla
+            {t('resetDefault')}
           </button>
         </div>
         <div className="control-row">
-          <label>Font</label>
+          <label>{t('font')}</label>
           <select value={overlay.fontFamily} onChange={e => dispatch({ type: 'UPDATE_OVERLAY', data: { fontFamily: e.target.value } })}>
             {fonts.map(f => <option key={f} value={f}>{f}</option>)}
           </select>
         </div>
         <div className="control-row">
-          <label>Font Boyutu</label>
+          <label>{t('fontSize')}</label>
           <input type="range" min="16" max="192" value={overlay.fontSize} onChange={e => dispatch({ type: 'UPDATE_OVERLAY', data: { fontSize: +e.target.value } })} />
           <span className="range-value">{overlay.fontSize}px</span>
         </div>
         <div className="control-row">
-          <label>Font Rengi</label>
+          <label>{t('fontColor')}</label>
           <input type="color" value={overlay.fontColor} onChange={e => dispatch({ type: 'UPDATE_OVERLAY', data: { fontColor: e.target.value } })} />
         </div>
         <div className="control-row">
-          <label>Arka Plan Rengi</label>
+          <label>{t('bgColor')}</label>
           <input type="color" value={overlay.bgColor} onChange={e => dispatch({ type: 'UPDATE_OVERLAY', data: { bgColor: e.target.value } })} />
         </div>
         <div className="control-row">
-          <label>Arka Plan Opaklığı</label>
+          <label>{t('bgOpacity')}</label>
           <input type="range" min="0" max="100" value={Math.round(overlay.bgOpacity * 100)} onChange={e => dispatch({ type: 'UPDATE_OVERLAY', data: { bgOpacity: e.target.value / 100 } })} />
           <span className="range-value">{Math.round(overlay.bgOpacity * 100)}%</span>
         </div>
         <div className="control-row">
-          <label>Blur</label>
+          <label>{t('blur')}</label>
           <input type="range" min="0" max="200" value={overlay.blur} onChange={e => dispatch({ type: 'UPDATE_OVERLAY', data: { blur: +e.target.value } })} />
           <span className="range-value">{overlay.blur}px</span>
         </div>
         <div className="control-row">
-          <label>Köşe Yuvarlaklığı</label>
+          <label>{t('borderRadius')}</label>
           <input type="range" min="0" max="200" value={overlay.borderRadius} onChange={e => dispatch({ type: 'UPDATE_OVERLAY', data: { borderRadius: +e.target.value } })} />
           <span className="range-value">{overlay.borderRadius}px</span>
         </div>
         <div className="control-row">
-          <label>Dikey Konum</label>
+          <label>{t('verticalPos')}</label>
           <input type="range" min="5" max="95" value={overlay.verticalPosition} onChange={e => dispatch({ type: 'UPDATE_OVERLAY', data: { verticalPosition: +e.target.value } })} />
           <span className="range-value">{overlay.verticalPosition}%</span>
         </div>
         <div className="control-row">
-          <label>Padding</label>
+          <label>{t('padding')}</label>
           <input type="range" min="8" max="200" value={overlay.padding} onChange={e => dispatch({ type: 'UPDATE_OVERLAY', data: { padding: +e.target.value } })} />
           <span className="range-value">{overlay.padding}px</span>
         </div>
       </Accordion>
 
       {/* Before/After */}
-      <Accordion title="Before/After Ayarları">
+      <Accordion title={t('baSettings')}>
         <div className="control-row">
-          <label>Split Oranı</label>
+          <label>{t('splitRatio')}</label>
           <input type="range" min="10" max="90" value={beforeAfter.splitRatio} onChange={e => dispatch({ type: 'UPDATE_BEFORE_AFTER', data: { splitRatio: +e.target.value } })} />
           <span className="range-value">{beforeAfter.splitRatio}%</span>
         </div>
         <div className="checkbox-row">
           <input type="checkbox" id="divider" checked={beforeAfter.showDivider} onChange={e => dispatch({ type: 'UPDATE_BEFORE_AFTER', data: { showDivider: e.target.checked } })} />
-          <label htmlFor="divider">Ayırıcı Çizgi</label>
+          <label htmlFor="divider">{t('dividerLine')}</label>
         </div>
         {beforeAfter.showDivider && (
           <>
             <div className="control-row">
-              <label>Ayırıcı Rengi</label>
+              <label>{t('dividerColor')}</label>
               <input type="color" value={beforeAfter.dividerColor} onChange={e => dispatch({ type: 'UPDATE_BEFORE_AFTER', data: { dividerColor: e.target.value } })} />
             </div>
             <div className="control-row">
-              <label>Ayırıcı Kalınlığı</label>
+              <label>{t('dividerWidth')}</label>
               <input type="range" min="1" max="8" value={beforeAfter.dividerWidth} onChange={e => dispatch({ type: 'UPDATE_BEFORE_AFTER', data: { dividerWidth: +e.target.value } })} />
               <span className="range-value">{beforeAfter.dividerWidth}px</span>
             </div>
@@ -1173,65 +1373,65 @@ function SettingsPanel({ state, dispatch }) {
         )}
         <div className="checkbox-row">
           <input type="checkbox" id="labels" checked={beforeAfter.showLabels} onChange={e => dispatch({ type: 'UPDATE_BEFORE_AFTER', data: { showLabels: e.target.checked } })} />
-          <label htmlFor="labels">Etiketleri Göster</label>
+          <label htmlFor="labels">{t('showLabels')}</label>
         </div>
         {beforeAfter.showLabels && (
           <>
             <div className="control-row">
-              <label>Sol Etiket</label>
+              <label>{t('leftLabel')}</label>
               <input type="text" value={beforeAfter.beforeLabel}
                 onChange={e => dispatch({ type: 'UPDATE_BEFORE_AFTER', data: { beforeLabel: e.target.value } })}
                 style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 10px', color: 'var(--text)', fontSize: 12, fontFamily: 'var(--font)', outline: 'none', width: 120, textAlign: 'right' }}
               />
             </div>
             <div className="control-row">
-              <label>Sağ Etiket</label>
+              <label>{t('rightLabel')}</label>
               <input type="text" value={beforeAfter.afterLabel}
                 onChange={e => dispatch({ type: 'UPDATE_BEFORE_AFTER', data: { afterLabel: e.target.value } })}
                 style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 10px', color: 'var(--text)', fontSize: 12, fontFamily: 'var(--font)', outline: 'none', width: 120, textAlign: 'right' }}
               />
             </div>
             <div className="control-row">
-              <label>Font</label>
+              <label>{t('font')}</label>
               <select value={beforeAfter.labelFontFamily} onChange={e => dispatch({ type: 'UPDATE_BEFORE_AFTER', data: { labelFontFamily: e.target.value } })}>
                 {fonts.map(f => <option key={f} value={f}>{f}</option>)}
               </select>
             </div>
             <div className="control-row">
-              <label>Font Boyutu</label>
+              <label>{t('fontSize')}</label>
               <input type="range" min="0" max="192" value={beforeAfter.labelFontSize} onChange={e => dispatch({ type: 'UPDATE_BEFORE_AFTER', data: { labelFontSize: +e.target.value } })} />
-              <span className="range-value">{beforeAfter.labelFontSize === 0 ? 'Oto' : beforeAfter.labelFontSize + 'px'}</span>
+              <span className="range-value">{beforeAfter.labelFontSize === 0 ? t('auto') : beforeAfter.labelFontSize + 'px'}</span>
             </div>
             <div className="control-row">
-              <label>Metin Rengi</label>
+              <label>{t('textColor')}</label>
               <input type="color" value={beforeAfter.labelTextColor} onChange={e => dispatch({ type: 'UPDATE_BEFORE_AFTER', data: { labelTextColor: e.target.value } })} />
             </div>
             <div className="control-row">
-              <label>Arka Plan Rengi</label>
+              <label>{t('bgColor')}</label>
               <input type="color" value={beforeAfter.labelBgColor} onChange={e => dispatch({ type: 'UPDATE_BEFORE_AFTER', data: { labelBgColor: e.target.value } })} />
             </div>
             <div className="control-row">
-              <label>Arka Plan Opaklığı</label>
+              <label>{t('bgOpacity')}</label>
               <input type="range" min="0" max="100" value={Math.round(beforeAfter.labelBgOpacity * 100)} onChange={e => dispatch({ type: 'UPDATE_BEFORE_AFTER', data: { labelBgOpacity: e.target.value / 100 } })} />
               <span className="range-value">{Math.round(beforeAfter.labelBgOpacity * 100)}%</span>
             </div>
             <div className="control-row">
-              <label>Blur</label>
+              <label>{t('blur')}</label>
               <input type="range" min="0" max="200" value={beforeAfter.labelBlur} onChange={e => dispatch({ type: 'UPDATE_BEFORE_AFTER', data: { labelBlur: +e.target.value } })} />
               <span className="range-value">{beforeAfter.labelBlur}px</span>
             </div>
             <div className="control-row">
-              <label>Köşe Yuvarlaklığı</label>
+              <label>{t('borderRadius')}</label>
               <input type="range" min="0" max="200" value={beforeAfter.labelBorderRadius} onChange={e => dispatch({ type: 'UPDATE_BEFORE_AFTER', data: { labelBorderRadius: +e.target.value } })} />
               <span className="range-value">{beforeAfter.labelBorderRadius}px</span>
             </div>
             <div className="control-row">
-              <label>Padding</label>
+              <label>{t('padding')}</label>
               <input type="range" min="0" max="200" value={beforeAfter.labelPadding} onChange={e => dispatch({ type: 'UPDATE_BEFORE_AFTER', data: { labelPadding: +e.target.value } })} />
-              <span className="range-value">{beforeAfter.labelPadding === 0 ? 'Oto' : beforeAfter.labelPadding + 'px'}</span>
+              <span className="range-value">{beforeAfter.labelPadding === 0 ? t('auto') : beforeAfter.labelPadding + 'px'}</span>
             </div>
             <div className="control-row">
-              <label>Dikey Konum</label>
+              <label>{t('verticalPos')}</label>
               <input type="range" min="5" max="95" value={beforeAfter.labelVerticalPosition} onChange={e => dispatch({ type: 'UPDATE_BEFORE_AFTER', data: { labelVerticalPosition: +e.target.value } })} />
               <span className="range-value">{beforeAfter.labelVerticalPosition}%</span>
             </div>
@@ -1240,7 +1440,7 @@ function SettingsPanel({ state, dispatch }) {
       </Accordion>
 
       {/* Export */}
-      <Accordion title="Dışa Aktarma">
+      <Accordion title={t('exportTitle')}>
         <div className="control-row">
           <label>Format</label>
           <select value={exportSettings.format} onChange={e => dispatch({ type: 'UPDATE_EXPORT', data: { format: e.target.value } })}>
@@ -1250,7 +1450,7 @@ function SettingsPanel({ state, dispatch }) {
         </div>
         {exportSettings.format === 'jpeg' && (
           <div className="control-row">
-            <label>Kalite</label>
+            <label>{t('quality')}</label>
             <input type="range" min="50" max="100" value={exportSettings.jpegQuality} onChange={e => dispatch({ type: 'UPDATE_EXPORT', data: { jpegQuality: +e.target.value } })} />
             <span className="range-value">{exportSettings.jpegQuality}%</span>
           </div>
@@ -1265,6 +1465,7 @@ function PresetPanel({ state, dispatch }) {
   const [presetName, setPresetName] = useState('');
   const fileInputRef = useRef();
   const presetNames = Object.keys(state.presets);
+  const t = useT();
 
   function handleSave() {
     const name = presetName.trim();
@@ -1281,12 +1482,12 @@ function PresetPanel({ state, dispatch }) {
       try {
         const data = JSON.parse(ev.target.result);
         if (!data.settings || !data.name) {
-          dispatch({ type: 'NOTIFY', message: 'Geçersiz preset dosyası.' });
+          dispatch({ type: 'NOTIFY', message: t('invalidPreset') });
           return;
         }
         dispatch({ type: 'IMPORT_PRESET', name: data.name, settings: data.settings });
       } catch {
-        dispatch({ type: 'NOTIFY', message: 'Preset dosyası okunamadı.' });
+        dispatch({ type: 'NOTIFY', message: t('presetReadError') });
       }
     };
     reader.readAsText(file);
@@ -1298,22 +1499,22 @@ function PresetPanel({ state, dispatch }) {
     if (!p) return;
     const { savedAt, ...settings } = p;
     downloadPresetFile(name, settings);
-    dispatch({ type: 'NOTIFY', message: `"${name}" dosya olarak indirildi` });
+    dispatch({ type: 'NOTIFY', message: `"${name}" ${t('presetDownloaded')}` });
   }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <div className="section-title">Presetler</div>
+      <div className="section-title">{t('presets')}</div>
 
       {/* Save */}
       <div className="template-save-row">
         <input
-          placeholder="Preset adı..."
+          placeholder={t('presetName')}
           value={presetName}
           onChange={e => setPresetName(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && handleSave()}
         />
-        <button disabled={!presetName.trim()} onClick={handleSave}>Kaydet</button>
+        <button disabled={!presetName.trim()} onClick={handleSave}>{t('save')}</button>
       </div>
 
       {/* Import */}
@@ -1334,26 +1535,26 @@ function PresetPanel({ state, dispatch }) {
           transition: 'all 0.2s'
         }}
       >
-        📂 Dosyadan İçe Aktar (.json)
+        {t('importFile')}
       </button>
 
       {/* List */}
       <div className="template-list">
         {presetNames.length === 0 && (
-          <div className="template-empty">Henüz kaydedilmiş preset yok</div>
+          <div className="template-empty">{t('noPresets')}</div>
         )}
         {presetNames.map(name => (
           <div key={name} className="template-item">
             <div
               className="template-item-name"
               onClick={() => dispatch({ type: 'LOAD_PRESET', name })}
-              title="Tıkla: Preseti uygula"
+              title={t('clickApply')}
             >
               {name}
             </div>
             <button
               onClick={() => handleExportExisting(name)}
-              title="Dosya olarak indir"
+              title={t('downloadFile')}
               style={{
                 width: 22, height: 22, border: 'none', borderRadius: 6,
                 background: 'rgba(249,115,22,0.15)', color: 'var(--accent1)',
@@ -1366,7 +1567,7 @@ function PresetPanel({ state, dispatch }) {
             <button
               className="template-item-delete"
               onClick={() => dispatch({ type: 'DELETE_PRESET', name })}
-              title="Preseti sil"
+              title={t('deletePreset')}
             >
               ×
             </button>
@@ -1381,6 +1582,7 @@ function PresetPanel({ state, dispatch }) {
 function CanvasPreview({ state, canvasRef }) {
   const rafRef = useRef(null);
   const timerRef = useRef(null);
+  const t = useT();
 
   const render = useCallback(() => {
     const canvas = canvasRef.current;
@@ -1418,7 +1620,7 @@ function CanvasPreview({ state, canvasRef }) {
         result = result.replace(/\s*·\s*·\s*/g, '  ·  ').replace(/^\s*·\s*/, '').replace(/\s*·\s*$/, '').trim();
         return result;
       }).filter(line => line.length > 0);
-      const lines = rawLines.length > 0 ? rawLines : ['EXIF bilgisi yok'];
+      const lines = rawLines.length > 0 ? rawLines : [t('noExifInfo')];
 
       const fontSize = overlay.fontSize;
       const fontStr = `${fontSize}px '${overlay.fontFamily}', sans-serif`;
@@ -1617,7 +1819,7 @@ function CanvasPreview({ state, canvasRef }) {
       <div className="canvas-wrapper">
         <div className="canvas-placeholder">
           <div className="icon">🖼</div>
-          <p>Başlamak için bir fotoğraf yükleyin</p>
+          <p>{t('uploadToStart')}</p>
         </div>
       </div>
     );
@@ -1634,11 +1836,33 @@ function CanvasPreview({ state, canvasRef }) {
 function App() {
   const [state, dispatch] = useReducer(reducer, initialState);
   const canvasRef = useRef(null);
+  const [lang, setLang] = useState(() => localStorage.getItem('instaprep_lang') || 'tr');
+  const [theme, setTheme] = useState(() => localStorage.getItem('instaprep_theme') || 'dark');
+
+  // Apply theme to document
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('instaprep_theme', theme);
+  }, [theme]);
+
+  useEffect(() => {
+    localStorage.setItem('instaprep_lang', lang);
+  }, [lang]);
+
+  const t = (key) => translations[lang]?.[key] || translations.tr[key] || key;
 
   // Persist settings to localStorage
   useEffect(() => {
     saveSettings(state);
   }, [state.overlay, state.beforeAfter, state.exportSettings]);
+
+  // Resolve notification message
+  function resolveNotification(n) {
+    if (!n) return null;
+    if (typeof n === 'string') return n;
+    if (n.key && n.name) return `"${n.name}" ${t(n.key)}`;
+    return String(n);
+  }
 
   // EXIF reading
   async function handleUneditedFile(file) {
@@ -1650,13 +1874,13 @@ function App() {
         const exifData = await parseExif(file);
         dispatch({ type: 'SET_EXIF', data: exifData });
         if (exifData._empty) {
-          dispatch({ type: 'SET_EXIF_ERROR', error: 'info:Bu fotoğrafta EXIF verisi bulunamadı — bilgileri manuel olarak girebilirsiniz.' });
+          dispatch({ type: 'SET_EXIF_ERROR', error: 'info:' + t('exifNotFound') });
         }
       } catch (err) {
-        dispatch({ type: 'SET_EXIF_ERROR', error: err.message || 'EXIF verisi okunamadı — bilgileri manuel olarak girebilirsiniz.' });
+        dispatch({ type: 'SET_EXIF_ERROR', error: err.message || t('exifReadError') });
       }
     } catch (err) {
-      dispatch({ type: 'NOTIFY', message: 'Görsel yüklenemedi.' });
+      dispatch({ type: 'NOTIFY', message: t('imageLoadError') });
     }
   }
 
@@ -1665,7 +1889,7 @@ function App() {
       const { image, thumb } = await loadImage(file);
       dispatch({ type: 'SET_EDITED', file, image, thumb });
     } catch {
-      dispatch({ type: 'NOTIFY', message: 'Görsel yüklenemedi.' });
+      dispatch({ type: 'NOTIFY', message: t('imageLoadError') });
     }
   }
 
@@ -1681,14 +1905,14 @@ function App() {
     a.download = `instagram_${tabName}_${Date.now()}.${format === 'png' ? 'png' : 'jpg'}`;
     a.href = dataUrl;
     a.click();
-    dispatch({ type: 'NOTIFY', message: 'Fotoğraf indirildi!' });
+    dispatch({ type: 'NOTIFY', message: t('photoDownloaded') });
   }
 
   // Clear notification
   useEffect(() => {
     if (state.notification) {
-      const t = setTimeout(() => dispatch({ type: 'CLEAR_NOTIFY' }), 3000);
-      return () => clearTimeout(t);
+      const ti = setTimeout(() => dispatch({ type: 'CLEAR_NOTIFY' }), 3000);
+      return () => clearTimeout(ti);
     }
   }, [state.notification]);
 
@@ -1700,30 +1924,43 @@ function App() {
     beforeafter: hasBoth
   };
 
+  const toggleTheme = () => setTheme(prev => prev === 'dark' ? 'light' : 'dark');
+  const toggleLang = () => setLang(prev => prev === 'tr' ? 'en' : 'tr');
+
   return (
+    <LangContext.Provider value={lang}>
+    <ThemeContext.Provider value={theme}>
     <div className="app-container">
       <div className="sidebar">
         {/* Header */}
         <div className="header">
           <div className="header-logo">📷</div>
-          <div>
+          <div style={{ flex: 1 }}>
             <h1>InstaPrep</h1>
-            <p>Fotoğraf Hazırlama Aracı</p>
+            <p>{t('subtitle')}</p>
+          </div>
+          <div className="toggle-group">
+            <button className="toggle-btn" onClick={toggleTheme} title="Toggle theme">
+              <span className="toggle-icon">{theme === 'dark' ? '☀️' : '🌙'}</span>
+            </button>
+            <button className="toggle-btn" onClick={toggleLang} title="Toggle language">
+              {lang === 'tr' ? 'EN' : 'TR'}
+            </button>
           </div>
         </div>
 
         {/* Upload */}
         <div>
-          <div className="section-title">Fotoğraflar</div>
+          <div className="section-title">{t('photos')}</div>
           <div className="dropzone-row">
             <DropZone
-              label="Editlenmemiş"
+              label={t('unedited')}
               thumb={state.uneditedThumb}
               onFile={handleUneditedFile}
               onRemove={() => dispatch({ type: 'REMOVE_UNEDITED' })}
             />
             <DropZone
-              label="Editlenmiş"
+              label={t('edited')}
               thumb={state.editedThumb}
               onFile={handleEditedFile}
               onRemove={() => dispatch({ type: 'REMOVE_EDITED' })}
@@ -1747,12 +1984,12 @@ function App() {
           <button className={`tab-btn ${state.activeTab === 'overlay' ? 'active' : ''}`}
             disabled={!canShowTab.overlay}
             onClick={() => dispatch({ type: 'SET_TAB', tab: 'overlay' })}>
-            EXIF Overlay
+            {t('exifOverlay')}
           </button>
           <button className={`tab-btn ${state.activeTab === 'beforeafter' ? 'active' : ''}`}
             disabled={!canShowTab.beforeafter}
             onClick={() => dispatch({ type: 'SET_TAB', tab: 'beforeafter' })}>
-            Before / After
+            {t('beforeAfter')}
           </button>
         </div>
 
@@ -1761,13 +1998,15 @@ function App() {
 
         {/* Download */}
         <button className="download-btn" disabled={!hasImage} onClick={handleDownload}>
-          ⬇ İndir ({state.exportSettings.format.toUpperCase()})
+          ⬇ {t('download')} ({state.exportSettings.format.toUpperCase()})
         </button>
       </div>
 
       {/* Notification */}
-      {state.notification && <div className="notification">{state.notification}</div>}
+      {state.notification && <div className="notification">{resolveNotification(state.notification)}</div>}
     </div>
+    </ThemeContext.Provider>
+    </LangContext.Provider>
   );
 }
 
