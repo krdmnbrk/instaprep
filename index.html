@@ -693,10 +693,19 @@ const translations = {
     shutter: 'Enstantane',
     aperture: 'Diyafram',
     focalLength: 'Odak Uzaklığı',
+    dateTime: 'Tarih',
+    customText: 'Özel Metin',
+    customTextPlaceholder: '@kullanici, lokasyon vb.',
     settings: 'Ayarlar',
     crop: 'Kırpma (Aspect Ratio)',
     original: 'Orijinal',
+    frameSettings: 'Çerçeve',
+    frameEnabled: 'Çerçeve Ekle',
+    frameColor: 'Çerçeve Rengi',
+    frameSize: 'Çerçeve Kalınlığı',
     overlaySettings: 'EXIF Overlay Ayarları',
+    showOverlay: 'Overlay Göster',
+    horizontalPos: 'Yatay Konum',
     textTemplate: 'Metin Şablonu',
     templateHelp: 'Her satır (\\n) overlay\'da ayrı satır olarak gösterilir. Değeri olmayan alanlar otomatik temizlenir.',
     templateVars: 'Kullanılabilir:',
@@ -737,6 +746,9 @@ const translations = {
     instaOptimize: '📷 Instagram Optimize',
     instaOptimizeDesc: 'Genişlik 1080px · JPEG %92 · Instagram için ideal',
     exportDimensions: 'Çıktı boyutu',
+    copyToClipboard: 'Panoya Kopyala',
+    copiedToClipboard: 'Panoya kopyalandı!',
+    copyFailed: 'Kopyalama başarısız — tarayıcı desteklemiyor olabilir.',
     presets: 'Presetler',
     presetName: 'Preset adı...',
     save: 'Kaydet',
@@ -780,10 +792,19 @@ const translations = {
     shutter: 'Shutter Speed',
     aperture: 'Aperture',
     focalLength: 'Focal Length',
+    dateTime: 'Date',
+    customText: 'Custom Text',
+    customTextPlaceholder: '@username, location etc.',
     settings: 'Settings',
     crop: 'Crop (Aspect Ratio)',
     original: 'Original',
+    frameSettings: 'Frame',
+    frameEnabled: 'Add Frame',
+    frameColor: 'Frame Color',
+    frameSize: 'Frame Size',
     overlaySettings: 'EXIF Overlay Settings',
+    showOverlay: 'Show Overlay',
+    horizontalPos: 'Horizontal Position',
     textTemplate: 'Text Template',
     templateHelp: 'Each line (\\n) is shown as a separate line on the overlay. Empty fields are cleaned up automatically.',
     templateVars: 'Available:',
@@ -824,6 +845,9 @@ const translations = {
     instaOptimize: '📷 Instagram Optimize',
     instaOptimizeDesc: 'Width 1080px · JPEG 92% · Ideal for Instagram',
     exportDimensions: 'Output size',
+    copyToClipboard: 'Copy to Clipboard',
+    copiedToClipboard: 'Copied to clipboard!',
+    copyFailed: 'Copy failed — browser may not support this.',
     presets: 'Presets',
     presetName: 'Preset name...',
     save: 'Save',
@@ -877,6 +901,7 @@ function saveSettings(state) {
   try {
     const toSave = {
       overlay: state.overlay,
+      frame: state.frame,
       beforeAfter: state.beforeAfter,
       exportSettings: state.exportSettings
     };
@@ -899,6 +924,7 @@ function saveTemplates(templates) {
 function extractSettingsForTemplate(state) {
   return {
     overlay: { ...state.overlay },
+    frame: { ...state.frame },
     beforeAfter: { ...state.beforeAfter },
     exportSettings: { ...state.exportSettings }
   };
@@ -938,8 +964,15 @@ const defaultSettings = {
     blur: 18,
     borderRadius: 24,
     verticalPosition: 85,
+    horizontalPosition: 50,
     padding: 32,
+    showOverlay: true,
     textTemplate: '{camera}\n{lens}\nISO {iso}  ·  {shutterSpeed}s  ·  {aperture}  ·  {focalLength}'
+  },
+  frame: {
+    enabled: false,
+    color: '#ffffff',
+    size: 60
   },
   beforeAfter: {
     direction: 'left-right',
@@ -968,6 +1001,9 @@ const defaultSettings = {
   }
 };
 
+// 9:16 ratio for stories/reels
+const ASPECT_RATIOS = ['original', '1:1', '4:5', '16:9', '9:16'];
+
 const saved = loadSettings();
 
 const initialState = {
@@ -977,11 +1013,12 @@ const initialState = {
   editedFile: null,
   editedImage: null,
   editedThumb: null,
-  exif: { camera: '', lens: '', iso: '', shutterSpeed: '', aperture: '', focalLength: '' },
+  exif: { camera: '', lens: '', iso: '', shutterSpeed: '', aperture: '', focalLength: '', dateTime: '', custom: '' },
   exifLoading: false,
   exifError: null,
   activeTab: 'overlay',
   overlay: saved ? { ...defaultSettings.overlay, ...saved.overlay } : defaultSettings.overlay,
+  frame: saved ? { ...defaultSettings.frame, ...saved.frame } : defaultSettings.frame,
   beforeAfter: saved ? { ...defaultSettings.beforeAfter, ...saved.beforeAfter } : defaultSettings.beforeAfter,
   exportSettings: saved ? { ...defaultSettings.exportSettings, ...saved.exportSettings } : defaultSettings.exportSettings,
   templates: loadTemplates(),
@@ -992,6 +1029,7 @@ const initialState = {
 // Capture page-load settings as the reset target for double-click
 const pageDefaults = {
   overlay: { ...initialState.overlay },
+  frame: { ...initialState.frame },
   beforeAfter: { ...initialState.beforeAfter },
   exportSettings: { ...initialState.exportSettings }
 };
@@ -1018,6 +1056,8 @@ function reducer(state, action) {
       return { ...state, activeTab: action.tab };
     case 'UPDATE_OVERLAY':
       return { ...state, overlay: { ...state.overlay, ...action.data } };
+    case 'UPDATE_FRAME':
+      return { ...state, frame: { ...state.frame, ...action.data } };
     case 'UPDATE_BEFORE_AFTER':
       return { ...state, beforeAfter: { ...state.beforeAfter, ...action.data } };
     case 'UPDATE_EXPORT':
@@ -1035,6 +1075,7 @@ function reducer(state, action) {
       return {
         ...state,
         overlay: { ...defaultSettings.overlay, ...tpl.overlay },
+        frame: { ...defaultSettings.frame, ...tpl.frame },
         beforeAfter: { ...defaultSettings.beforeAfter, ...tpl.beforeAfter },
         exportSettings: { ...defaultSettings.exportSettings, ...tpl.exportSettings },
         notification: { key: 'templateLoaded', name: `${action.name} (${action.orientation})` }
@@ -1062,6 +1103,7 @@ function reducer(state, action) {
       return {
         ...state,
         overlay: { ...defaultSettings.overlay, ...p.overlay },
+        frame: { ...defaultSettings.frame, ...p.frame },
         beforeAfter: { ...defaultSettings.beforeAfter, ...p.beforeAfter },
         exportSettings: { ...defaultSettings.exportSettings, ...p.exportSettings },
         notification: { key: 'presetLoaded', name: action.name }
@@ -1081,6 +1123,7 @@ function reducer(state, action) {
         ...state,
         presets: newPresets,
         overlay: { ...defaultSettings.overlay, ...settings.overlay },
+        frame: { ...defaultSettings.frame, ...settings.frame },
         beforeAfter: { ...defaultSettings.beforeAfter, ...settings.beforeAfter },
         exportSettings: { ...defaultSettings.exportSettings, ...settings.exportSettings },
         notification: { key: 'presetImported', name }
@@ -1121,7 +1164,7 @@ async function parseExif(file) {
   }
 
   if (!data) {
-    return { camera: '', lens: '', iso: '', shutterSpeed: '', aperture: '', focalLength: '', _empty: true };
+    return { camera: '', lens: '', iso: '', shutterSpeed: '', aperture: '', focalLength: '', dateTime: '', _empty: true };
   }
 
   const make = data.Make || '';
@@ -1137,10 +1180,22 @@ async function parseExif(file) {
   const aperture = data.FNumber ? `f/${data.FNumber}` : '';
   const focalLength = data.FocalLength ? `${data.FocalLength}mm` : '';
 
-  const result = { camera: camera.replace(/\s+/g, ' ').trim(), lens: String(lens), iso, shutterSpeed, aperture, focalLength };
+  // Date extraction
+  let dateTime = '';
+  const rawDate = data.DateTimeOriginal || data.CreateDate || data.DateTime;
+  if (rawDate) {
+    try {
+      const d = rawDate instanceof Date ? rawDate : new Date(rawDate);
+      if (!isNaN(d.getTime())) {
+        dateTime = d.toLocaleDateString('tr-TR', { year: 'numeric', month: 'long', day: 'numeric' });
+      }
+    } catch {}
+  }
+
+  const result = { camera: camera.replace(/\s+/g, ' ').trim(), lens: String(lens), iso, shutterSpeed, aperture, focalLength, dateTime };
 
   // Flag if no useful EXIF field was found
-  if (!result.camera && !result.lens && !result.iso && !result.shutterSpeed && !result.aperture && !result.focalLength) {
+  if (!result.camera && !result.lens && !result.iso && !result.shutterSpeed && !result.aperture && !result.focalLength && !result.dateTime) {
     result._empty = true;
   }
 
@@ -1149,7 +1204,7 @@ async function parseExif(file) {
 
 function getCropRect(imgW, imgH, ratio) {
   if (ratio === 'original') return { sx: 0, sy: 0, sw: imgW, sh: imgH };
-  const ratioMap = { '1:1': 1, '4:5': 4/5, '16:9': 16/9 };
+  const ratioMap = { '1:1': 1, '4:5': 4/5, '16:9': 16/9, '9:16': 9/16 };
   const target = ratioMap[ratio];
   const imgRatio = imgW / imgH;
   let sw, sh, sx, sy;
@@ -1231,7 +1286,9 @@ function ExifDisplay({ exif, exifLoading, exifError, dispatch }) {
     { key: 'iso', label: t('iso') },
     { key: 'shutterSpeed', label: t('shutter') },
     { key: 'aperture', label: t('aperture') },
-    { key: 'focalLength', label: t('focalLength') }
+    { key: 'focalLength', label: t('focalLength') },
+    { key: 'dateTime', label: t('dateTime') },
+    { key: 'custom', label: t('customText') }
   ];
 
   const isInfoMessage = exifError && exifError.startsWith('info:');
@@ -1257,12 +1314,12 @@ function ExifDisplay({ exif, exifLoading, exifError, dispatch }) {
       )}
       <div className="exif-grid">
         {fields.map(f => (
-          <div key={f.key} className="exif-field" style={f.key === 'camera' || f.key === 'lens' ? { gridColumn: 'span 2' } : {}}>
+          <div key={f.key} className="exif-field" style={f.key === 'camera' || f.key === 'lens' || f.key === 'custom' ? { gridColumn: 'span 2' } : {}}>
             <label>{f.label}</label>
             <input
               value={exif[f.key]}
               onChange={e => dispatch({ type: 'UPDATE_EXIF_FIELD', field: f.key, value: e.target.value })}
-              placeholder="-"
+              placeholder={f.key === 'custom' ? t('customTextPlaceholder') : '-'}
             />
           </div>
         ))}
@@ -1287,7 +1344,7 @@ function Accordion({ title, defaultOpen, children }) {
 
 // ─── Settings Panel ────────────────────────────────────────
 function SettingsPanel({ state, dispatch }) {
-  const { overlay, beforeAfter, exportSettings } = state;
+  const { overlay, frame, beforeAfter, exportSettings } = state;
   const fonts = ['DM Sans', 'Outfit', 'Plus Jakarta Sans', 'Space Grotesk', 'JetBrains Mono', 'Playfair Display'];
   const t = useT();
 
@@ -1298,7 +1355,7 @@ function SettingsPanel({ state, dispatch }) {
       {/* Crop */}
       <Accordion title={t('crop')} defaultOpen>
         <div className="ratio-group">
-          {['original', '1:1', '4:5', '16:9'].map(r => (
+          {ASPECT_RATIOS.map(r => (
             <button key={r} className={`ratio-btn ${exportSettings.aspectRatio === r ? 'active' : ''}`}
               onClick={() => dispatch({ type: 'UPDATE_EXPORT', data: { aspectRatio: r } })}>
               {r === 'original' ? t('original') : r}
@@ -1307,8 +1364,34 @@ function SettingsPanel({ state, dispatch }) {
         </div>
       </Accordion>
 
+      {/* Frame */}
+      <Accordion title={t('frameSettings')}>
+        <div className="checkbox-row">
+          <input type="checkbox" id="frame-enabled" checked={frame.enabled} onChange={e => dispatch({ type: 'UPDATE_FRAME', data: { enabled: e.target.checked } })} />
+          <label htmlFor="frame-enabled">{t('frameEnabled')}</label>
+        </div>
+        {frame.enabled && (
+          <>
+            <div className="control-row">
+              <label>{t('frameColor')}</label>
+              <input type="color" value={frame.color} onChange={e => dispatch({ type: 'UPDATE_FRAME', data: { color: e.target.value } })} />
+            </div>
+            <div className="control-row">
+              <label>{t('frameSize')}</label>
+              <input type="range" min="10" max="300" value={frame.size} onChange={e => dispatch({ type: 'UPDATE_FRAME', data: { size: +e.target.value } })} onDoubleClick={() => dispatch({ type: 'UPDATE_FRAME', data: { size: pageDefaults.frame.size } })} />
+              <span className="range-value">{frame.size}px</span>
+            </div>
+          </>
+        )}
+      </Accordion>
+
       {/* Overlay */}
       <Accordion title={t('overlaySettings')}>
+        <div className="checkbox-row">
+          <input type="checkbox" id="show-overlay" checked={overlay.showOverlay !== false} onChange={e => dispatch({ type: 'UPDATE_OVERLAY', data: { showOverlay: e.target.checked } })} />
+          <label htmlFor="show-overlay">{t('showOverlay')}</label>
+        </div>
+        {overlay.showOverlay === false ? null : (<>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           <label style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 500 }}>{t('textTemplate')}</label>
           <textarea
@@ -1331,7 +1414,7 @@ function SettingsPanel({ state, dispatch }) {
             placeholder="{camera}&#10;{lens}&#10;ISO {iso}  ·  {shutterSpeed}s  ·  {aperture}  ·  {focalLength}"
           />
           <div style={{ fontSize: 10, color: 'var(--text-muted)', opacity: 0.7, lineHeight: 1.5 }}>
-            {t('templateVars')} <code style={{ background: 'var(--surface2)', padding: '1px 4px', borderRadius: 4 }}>{'{camera}'}</code> <code style={{ background: 'var(--surface2)', padding: '1px 4px', borderRadius: 4 }}>{'{lens}'}</code> <code style={{ background: 'var(--surface2)', padding: '1px 4px', borderRadius: 4 }}>{'{iso}'}</code> <code style={{ background: 'var(--surface2)', padding: '1px 4px', borderRadius: 4 }}>{'{shutterSpeed}'}</code> <code style={{ background: 'var(--surface2)', padding: '1px 4px', borderRadius: 4 }}>{'{aperture}'}</code> <code style={{ background: 'var(--surface2)', padding: '1px 4px', borderRadius: 4 }}>{'{focalLength}'}</code>
+            {t('templateVars')} <code style={{ background: 'var(--surface2)', padding: '1px 4px', borderRadius: 4 }}>{'{camera}'}</code> <code style={{ background: 'var(--surface2)', padding: '1px 4px', borderRadius: 4 }}>{'{lens}'}</code> <code style={{ background: 'var(--surface2)', padding: '1px 4px', borderRadius: 4 }}>{'{iso}'}</code> <code style={{ background: 'var(--surface2)', padding: '1px 4px', borderRadius: 4 }}>{'{shutterSpeed}'}</code> <code style={{ background: 'var(--surface2)', padding: '1px 4px', borderRadius: 4 }}>{'{aperture}'}</code> <code style={{ background: 'var(--surface2)', padding: '1px 4px', borderRadius: 4 }}>{'{focalLength}'}</code> <code style={{ background: 'var(--surface2)', padding: '1px 4px', borderRadius: 4 }}>{'{date}'}</code> <code style={{ background: 'var(--surface2)', padding: '1px 4px', borderRadius: 4 }}>{'{custom}'}</code>
             <br/>{t('templateHelp')}
           </div>
           <button
@@ -1391,10 +1474,16 @@ function SettingsPanel({ state, dispatch }) {
           <span className="range-value">{overlay.verticalPosition}%</span>
         </div>
         <div className="control-row">
+          <label>{t('horizontalPos')}</label>
+          <input type="range" min="5" max="95" value={overlay.horizontalPosition || 50} onChange={e => dispatch({ type: 'UPDATE_OVERLAY', data: { horizontalPosition: +e.target.value } })} onDoubleClick={() => dispatch({ type: 'UPDATE_OVERLAY', data: { horizontalPosition: 50 } })} />
+          <span className="range-value">{overlay.horizontalPosition || 50}%</span>
+        </div>
+        <div className="control-row">
           <label>{t('padding')}</label>
           <input type="range" min="8" max="200" value={overlay.padding} onChange={e => dispatch({ type: 'UPDATE_OVERLAY', data: { padding: +e.target.value } })} onDoubleClick={() => dispatch({ type: 'UPDATE_OVERLAY', data: { padding: pageDefaults.overlay.padding } })} />
           <span className="range-value">{overlay.padding}px</span>
         </div>
+        </>)}
       </Accordion>
 
       {/* Before/After */}
@@ -1677,19 +1766,32 @@ function CanvasPreview({ state, canvasRef }) {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
-    const { activeTab, editedImage, uneditedImage, exif, overlay, beforeAfter, exportSettings } = state;
+    const { activeTab, editedImage, uneditedImage, exif, overlay, frame, beforeAfter, exportSettings } = state;
 
     const mainImg = editedImage || uneditedImage;
     if (!mainImg) return;
 
     const crop = getCropRect(mainImg.naturalWidth, mainImg.naturalHeight, exportSettings.aspectRatio);
-    canvas.width = crop.sw;
-    canvas.height = crop.sh;
+
+    // Frame support
+    const frameEnabled = frame && frame.enabled;
+    const frameSize = frameEnabled ? (frame.size || 60) : 0;
+    canvas.width = crop.sw + frameSize * 2;
+    canvas.height = crop.sh + frameSize * 2;
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+    // Draw frame background
+    if (frameEnabled) {
+      ctx.fillStyle = frame.color || '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
     if (activeTab === 'overlay') {
-      ctx.drawImage(mainImg, crop.sx, crop.sy, crop.sw, crop.sh, 0, 0, crop.sw, crop.sh);
+      ctx.drawImage(mainImg, crop.sx, crop.sy, crop.sw, crop.sh, frameSize, frameSize, crop.sw, crop.sh);
+
+      // Skip overlay rendering if disabled
+      if (overlay.showOverlay === false) return;
 
       // Build text lines from template
       const templateStr = overlay.textTemplate || '{camera}\n{lens}\nISO {iso}  ·  {shutterSpeed}s  ·  {aperture}  ·  {focalLength}';
@@ -1699,7 +1801,9 @@ function CanvasPreview({ state, canvasRef }) {
         iso: exif.iso || '',
         shutterSpeed: exif.shutterSpeed || '',
         aperture: exif.aperture || '',
-        focalLength: exif.focalLength || ''
+        focalLength: exif.focalLength || '',
+        date: exif.dateTime || '',
+        custom: exif.custom || ''
       };
       const rawLines = templateStr.split('\n').map(line => {
         let result = line;
@@ -1727,7 +1831,8 @@ function CanvasPreview({ state, canvasRef }) {
 
       const boxW = maxTextW + pad * 2;
       const boxH = lines.length * lineHeight + pad * 2 - (lineHeight - fontSize);
-      const boxX = (canvas.width - boxW) / 2;
+      const hPos = (overlay.horizontalPosition || 50) / 100;
+      const boxX = (canvas.width - boxW) * hPos;
       const boxY = canvas.height * (overlay.verticalPosition / 100) - boxH / 2;
 
       // Glassmorphism: blur background behind box
@@ -1737,7 +1842,7 @@ function CanvasPreview({ state, canvasRef }) {
 
       if (overlay.blur > 0) {
         ctx.filter = `blur(${overlay.blur}px)`;
-        ctx.drawImage(mainImg, crop.sx, crop.sy, crop.sw, crop.sh, 0, 0, crop.sw, crop.sh);
+        ctx.drawImage(mainImg, crop.sx, crop.sy, crop.sw, crop.sh, frameSize, frameSize, crop.sw, crop.sh);
         ctx.filter = 'none';
       }
 
@@ -1762,9 +1867,10 @@ function CanvasPreview({ state, canvasRef }) {
       ctx.textAlign = 'center';
       ctx.textBaseline = 'top';
 
+      const textCenterX = boxX + boxW / 2;
       const textStartY = boxY + pad;
       lines.forEach((line, i) => {
-        ctx.fillText(line, canvas.width / 2, textStartY + i * lineHeight);
+        ctx.fillText(line, textCenterX, textStartY + i * lineHeight);
       });
     }
 
@@ -1783,10 +1889,21 @@ function CanvasPreview({ state, canvasRef }) {
       const beforeCrop = getCropRect(beforeImg.naturalWidth, beforeImg.naturalHeight, exportSettings.aspectRatio);
       const afterCrop = getCropRect(afterImg.naturalWidth, afterImg.naturalHeight, exportSettings.aspectRatio);
 
-      canvas.width = afterCrop.sw;
-      canvas.height = afterCrop.sh;
-      const W = canvas.width;
-      const H = canvas.height;
+      canvas.width = afterCrop.sw + frameSize * 2;
+      canvas.height = afterCrop.sh + frameSize * 2;
+      // Re-draw frame bg for before/after
+      if (frameEnabled) {
+        ctx.fillStyle = frame.color || '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
+
+      // Translate to inner area so all before/after drawing is frame-aware
+      ctx.save();
+      if (frameSize > 0) {
+        ctx.translate(frameSize, frameSize);
+      }
+      const W = afterCrop.sw;
+      const H = afterCrop.sh;
 
       if (isDiagonal) {
         // Determine which corners belong to "before" triangle
@@ -2075,6 +2192,7 @@ function CanvasPreview({ state, canvasRef }) {
         drawLabel(afterText, afterCx, afterCy);
       }
       } // end non-diagonal else
+      ctx.restore(); // restore translate for frame offset
     }
   }, [state]);
 
@@ -2133,7 +2251,7 @@ function App() {
   // Persist settings to localStorage
   useEffect(() => {
     saveSettings(state);
-  }, [state.overlay, state.beforeAfter, state.exportSettings]);
+  }, [state.overlay, state.frame, state.beforeAfter, state.exportSettings]);
 
   // Resolve notification message
   function resolveNotification(n) {
@@ -2258,6 +2376,42 @@ function App() {
     dispatch({ type: 'NOTIFY', message: t('photoDownloaded') });
   }
 
+  async function handleCopyToClipboard() {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    try {
+      let { format, jpegQuality, resizeMode } = state.exportSettings;
+      if (resizeMode === 'insta') {
+        format = 'jpeg';
+        jpegQuality = 92;
+      }
+
+      let exportCanvas = canvas;
+      if (resizeMode === 'width1080' || resizeMode === 'insta') {
+        if (canvas.width > 1080) {
+          const scale = 1080 / canvas.width;
+          const newW = 1080;
+          const newH = Math.round(canvas.height * scale);
+          const tempCanvas = document.createElement('canvas');
+          tempCanvas.width = newW;
+          tempCanvas.height = newH;
+          const tempCtx = tempCanvas.getContext('2d');
+          tempCtx.drawImage(canvas, 0, 0, newW, newH);
+          exportCanvas = tempCanvas;
+        }
+      }
+
+      const blob = await new Promise(resolve => exportCanvas.toBlob(resolve, 'image/png'));
+      await navigator.clipboard.write([
+        new ClipboardItem({ 'image/png': blob })
+      ]);
+      dispatch({ type: 'NOTIFY', message: t('copiedToClipboard') });
+    } catch (err) {
+      console.error('Clipboard copy failed:', err);
+      dispatch({ type: 'NOTIFY', message: t('copyFailed') });
+    }
+  }
+
   // Clear notification
   useEffect(() => {
     if (state.notification) {
@@ -2368,10 +2522,21 @@ function App() {
           );
         })()}
 
-        {/* Download */}
-        <button className="download-btn" disabled={!hasImage} onClick={handleDownload}>
-          ⬇ {t('download')} ({state.exportSettings.format.toUpperCase()}{state.exportSettings.resizeMode === 'insta' ? ' · IG' : ''})
-        </button>
+        {/* Download + Copy */}
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="download-btn" style={{ flex: 1 }} disabled={!hasImage} onClick={handleDownload}>
+            ⬇ {t('download')} ({state.exportSettings.format.toUpperCase()}{state.exportSettings.resizeMode === 'insta' ? ' · IG' : ''})
+          </button>
+          <button
+            className="download-btn"
+            style={{ flex: 'none', width: 52, padding: '14px 0', background: 'var(--surface2)', color: 'var(--text)', border: '1px solid var(--border)' }}
+            disabled={!hasImage}
+            onClick={handleCopyToClipboard}
+            title={t('copyToClipboard')}
+          >
+            📋
+          </button>
+        </div>
       </div>
 
       {/* Notification */}
