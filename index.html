@@ -66,7 +66,8 @@ body {
 
 .sidebar {
   width: 360px;
-  min-width: 360px;
+  min-width: 300px;
+  max-width: 600px;
   border-right: 1px solid var(--border);
   overflow-y: auto;
   max-height: 100vh;
@@ -74,10 +75,30 @@ body {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.sidebar-resize-handle {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 100;
+  background: transparent;
+  transition: background 0.15s;
+}
+
+.sidebar-resize-handle:hover,
+.sidebar-resize-handle.active {
+  background: var(--accent1);
 }
 
 .main-area {
   flex: 1;
+  min-width: 0;
   padding: 24px;
   overflow-y: auto;
   max-height: 100vh;
@@ -164,6 +185,17 @@ body {
 .dropzone .icon { font-size: 28px; opacity: 0.5; }
 .dropzone .label { font-size: 12px; color: var(--text-muted); font-weight: 500; }
 .dropzone .sublabel { font-size: 10px; color: var(--text-muted); opacity: 0.6; }
+.dropzone-filename {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
+  padding: 4px 6px 0;
+  font-family: 'JetBrains Mono', monospace;
+}
 
 .dropzone .remove-btn {
   position: absolute;
@@ -282,6 +314,7 @@ body {
   color: var(--text-muted);
   white-space: nowrap;
   font-weight: 500;
+  flex-shrink: 0;
 }
 
 .control-row select,
@@ -302,7 +335,7 @@ body {
 
 .control-row input[type="range"] {
   flex: 1;
-  max-width: 140px;
+  min-width: 80px;
   accent-color: var(--accent1);
 }
 
@@ -320,8 +353,9 @@ body {
   font-size: 11px;
   font-family: 'JetBrains Mono', monospace;
   color: var(--text-muted);
-  min-width: 36px;
+  min-width: 44px;
   text-align: right;
+  flex-shrink: 0;
 }
 
 .checkbox-row {
@@ -376,11 +410,12 @@ body {
   padding: 4px;
   border-radius: 12px;
   border: 1px solid var(--border);
+  min-width: 0;
 }
 
 .tab-btn {
   flex: 1;
-  padding: 10px 16px;
+  padding: 10px 12px;
   border-radius: 10px;
   border: none;
   background: transparent;
@@ -391,6 +426,9 @@ body {
   font-family: var(--font);
   transition: all 0.2s;
   white-space: nowrap;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .tab-btn.active {
@@ -426,6 +464,7 @@ body {
   max-width: 100%;
   max-height: calc(100vh - 200px);
   object-fit: contain;
+  display: block;
 }
 
 .canvas-placeholder {
@@ -615,9 +654,13 @@ body {
   .sidebar {
     width: 100%;
     min-width: unset;
+    max-width: unset;
     max-height: unset;
     border-right: none;
     border-bottom: 1px solid var(--border);
+  }
+  .sidebar-resize-handle {
+    display: none;
   }
   .main-area {
     max-height: unset;
@@ -766,6 +809,7 @@ const translations = {
     deletePreset: 'Preseti sil',
     exifOverlay: 'EXIF Overlay',
     beforeAfter: 'Before / After',
+    finalPhoto: 'Final Photo',
     download: 'İndir',
     photoDownloaded: 'Fotoğraf indirildi!',
     uploadToStart: 'Başlamak için bir fotoğraf yükleyin',
@@ -865,6 +909,7 @@ const translations = {
     deletePreset: 'Delete preset',
     exifOverlay: 'EXIF Overlay',
     beforeAfter: 'Before / After',
+    finalPhoto: 'Final Photo',
     download: 'Download',
     photoDownloaded: 'Photo downloaded!',
     uploadToStart: 'Upload a photo to get started',
@@ -1234,7 +1279,7 @@ function roundRect(ctx, x, y, w, h, r) {
 }
 
 // ─── DropZone ──────────────────────────────────────────────
-function DropZone({ label, thumb, onFile, onRemove }) {
+function DropZone({ label, thumb, onFile, onRemove, fileName }) {
   const [dragOver, setDragOver] = useState(false);
   const inputRef = useRef();
   const t = useT();
@@ -1273,6 +1318,7 @@ function DropZone({ label, thumb, onFile, onRemove }) {
           <div className="sublabel">{t('dragOrClick')}</div>
         </>
       )}
+      {fileName && <div className="dropzone-filename" title={fileName}>{fileName}</div>}
     </div>
   );
 }
@@ -1760,6 +1806,8 @@ function PresetPanel({ state, dispatch }) {
 function CanvasPreview({ state, canvasRef }) {
   const rafRef = useRef(null);
   const timerRef = useRef(null);
+  const previewRef = useRef(null);
+  const wrapperRef = useRef(null);
   const t = useT();
 
   const render = useCallback(() => {
@@ -2194,7 +2242,65 @@ function CanvasPreview({ state, canvasRef }) {
       } // end non-diagonal else
       ctx.restore(); // restore translate for frame offset
     }
+
+    else if (activeTab === 'finalphoto') {
+      ctx.drawImage(mainImg, crop.sx, crop.sy, crop.sw, crop.sh, frameSize, frameSize, crop.sw, crop.sh);
+    }
+
+    // Update visible preview canvas with high-quality downscale
+    updatePreview(canvas);
   }, [state]);
+
+  const updatePreview = useCallback(async (srcCanvas) => {
+    const preview = previewRef.current;
+    const wrapper = wrapperRef.current;
+    if (!preview || !wrapper || !srcCanvas || !srcCanvas.width) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    const wrapperW = wrapper.clientWidth;
+    const wrapperMaxH = window.innerHeight - 200;
+
+    // Calculate display size that fits the wrapper while preserving aspect ratio
+    const aspect = srcCanvas.width / srcCanvas.height;
+    let dispW = wrapperW;
+    let dispH = dispW / aspect;
+    if (dispH > wrapperMaxH) {
+      dispH = wrapperMaxH;
+      dispW = dispH * aspect;
+    }
+
+    const pxW = Math.round(dispW * dpr);
+    const pxH = Math.round(dispH * dpr);
+
+    preview.style.width = Math.round(dispW) + 'px';
+    preview.style.height = Math.round(dispH) + 'px';
+
+    if (preview.width !== pxW || preview.height !== pxH) {
+      preview.width = pxW;
+      preview.height = pxH;
+    }
+
+    const pCtx = preview.getContext('2d', { alpha: false });
+
+    // Use createImageBitmap for Lanczos3 quality downscale
+    if (typeof createImageBitmap === 'function') {
+      try {
+        const bitmap = await createImageBitmap(srcCanvas, {
+          resizeWidth: pxW,
+          resizeHeight: pxH,
+          resizeQuality: 'high'
+        });
+        pCtx.drawImage(bitmap, 0, 0);
+        bitmap.close();
+        return;
+      } catch (e) {}
+    }
+
+    // Fallback
+    pCtx.imageSmoothingEnabled = true;
+    pCtx.imageSmoothingQuality = 'high';
+    pCtx.drawImage(srcCanvas, 0, 0, pxW, pxH);
+  }, []);
 
   useEffect(() => {
     clearTimeout(timerRef.current);
@@ -2222,8 +2328,9 @@ function CanvasPreview({ state, canvasRef }) {
   }
 
   return (
-    <div className="canvas-wrapper">
-      <canvas ref={canvasRef} />
+    <div className="canvas-wrapper" ref={wrapperRef}>
+      <canvas ref={canvasRef} style={{ display: 'none' }} />
+      <canvas ref={previewRef} />
     </div>
   );
 }
@@ -2232,8 +2339,35 @@ function CanvasPreview({ state, canvasRef }) {
 function App() {
   const [state, dispatch] = useReducer(reducer, initialState);
   const canvasRef = useRef(null);
+  const sidebarRef = useRef(null);
   const [lang, setLang] = useState(() => localStorage.getItem('instaprep_lang') || 'tr');
   const [theme, setTheme] = useState(() => localStorage.getItem('instaprep_theme') || 'dark');
+  const [isResizing, setIsResizing] = useState(false);
+
+  const handleResizeStart = useCallback((e) => {
+    e.preventDefault();
+    setIsResizing(true);
+    const startX = e.clientX;
+    const startWidth = sidebarRef.current.offsetWidth;
+
+    const onMouseMove = (e) => {
+      const newWidth = Math.min(600, Math.max(300, startWidth + (e.clientX - startX)));
+      sidebarRef.current.style.width = newWidth + 'px';
+    };
+
+    const onMouseUp = () => {
+      setIsResizing(false);
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  }, []);
 
   // Apply theme to document
   useEffect(() => {
@@ -2310,18 +2444,21 @@ function App() {
     if (!canvas || !canvas.width) return null;
     try {
       let { format, jpegQuality, resizeMode } = state.exportSettings;
-      if (resizeMode === 'insta') { format = 'jpeg'; jpegQuality = 92; }
+      if (resizeMode === 'insta') { format = 'jpeg'; jpegQuality = 95; }
       const mime = format === 'png' ? 'image/png' : 'image/jpeg';
       const quality = format === 'jpeg' ? jpegQuality / 100 : undefined;
 
       let src = canvas;
       if (resizeMode === 'width1080' || resizeMode === 'insta') {
         if (canvas.width > 1080) {
-          const scale = 1080 / canvas.width;
+          const tW = 1080;
+          const tH = Math.round(canvas.height * (1080 / canvas.width));
           const tmp = document.createElement('canvas');
-          tmp.width = 1080;
-          tmp.height = Math.round(canvas.height * scale);
-          tmp.getContext('2d').drawImage(canvas, 0, 0, tmp.width, tmp.height);
+          tmp.width = tW; tmp.height = tH;
+          const tCtx = tmp.getContext('2d');
+          tCtx.imageSmoothingEnabled = true;
+          tCtx.imageSmoothingQuality = 'high';
+          tCtx.drawImage(canvas, 0, 0, tW, tH);
           src = tmp;
         }
       }
@@ -2334,14 +2471,109 @@ function App() {
     } catch { return null; }
   }
 
-  function handleDownload() {
+  async function buildExportCanvas(targetWidth) {
+    const canvas = canvasRef.current;
+    if (!canvas) return canvas;
+    if (!targetWidth || canvas.width <= targetWidth) return canvas;
+
+    const targetH = Math.round(canvas.height * (targetWidth / canvas.width));
+    const mainImg = state.editedImage || state.uneditedImage;
+    const { activeTab, frame, exportSettings } = state;
+    const crop = mainImg ? getCropRect(mainImg.naturalWidth, mainImg.naturalHeight, exportSettings.aspectRatio) : null;
+    const frameEnabled = frame && frame.enabled;
+    const frameSize = frameEnabled ? (frame.size || 60) : 0;
+    const scale = targetWidth / canvas.width;
+
+    // For tabs that only draw a single image (no compositing),
+    // build the export canvas directly from the source image
+    // to avoid the intermediate full-res canvas decode-encode cycle.
+    const isSimpleTab = activeTab === 'finalphoto' || (activeTab === 'overlay' && state.overlay.showOverlay === false);
+
+    if (isSimpleTab && mainImg && crop) {
+      const scaledFrame = Math.round(frameSize * scale);
+      const innerW = targetWidth - scaledFrame * 2;
+      const innerH = targetH - scaledFrame * 2;
+
+      // Use createImageBitmap to crop+resize the original image in one step (Lanczos3 in Chromium)
+      if (typeof createImageBitmap === 'function') {
+        try {
+          const bitmap = await createImageBitmap(mainImg, crop.sx, crop.sy, crop.sw, crop.sh, {
+            resizeWidth: innerW,
+            resizeHeight: innerH,
+            resizeQuality: 'high'
+          });
+          const result = document.createElement('canvas');
+          result.width = targetWidth;
+          result.height = targetH;
+          const ctx = result.getContext('2d', { alpha: false });
+          if (frameEnabled) {
+            ctx.fillStyle = frame.color || '#ffffff';
+            ctx.fillRect(0, 0, targetWidth, targetH);
+          }
+          ctx.drawImage(bitmap, scaledFrame, scaledFrame);
+          bitmap.close();
+          return result;
+        } catch (e) {
+          // fall through to canvas-based resize
+        }
+      }
+    }
+
+    // Fallback: resize via createImageBitmap on the canvas, or step-down
+    if (typeof createImageBitmap === 'function') {
+      try {
+        const bitmap = await createImageBitmap(canvas, {
+          resizeWidth: targetWidth,
+          resizeHeight: targetH,
+          resizeQuality: 'high'
+        });
+        const result = document.createElement('canvas');
+        result.width = targetWidth;
+        result.height = targetH;
+        const ctx = result.getContext('2d', { alpha: false });
+        ctx.drawImage(bitmap, 0, 0);
+        bitmap.close();
+        return result;
+      } catch (e) {
+        // fall through
+      }
+    }
+
+    // Step-down fallback
+    let src = canvas;
+    let curW = src.width;
+    let curH = src.height;
+    while (curW / 2 > targetWidth) {
+      const halfW = Math.round(curW / 2);
+      const halfH = Math.round(curH / 2);
+      const step = document.createElement('canvas');
+      step.width = halfW;
+      step.height = halfH;
+      const sCtx = step.getContext('2d');
+      sCtx.imageSmoothingEnabled = true;
+      sCtx.imageSmoothingQuality = 'high';
+      sCtx.drawImage(src, 0, 0, halfW, halfH);
+      src = step;
+      curW = halfW;
+      curH = halfH;
+    }
+    const final = document.createElement('canvas');
+    final.width = targetWidth;
+    final.height = targetH;
+    const fCtx = final.getContext('2d');
+    fCtx.imageSmoothingEnabled = true;
+    fCtx.imageSmoothingQuality = 'high';
+    fCtx.drawImage(src, 0, 0, targetWidth, targetH);
+    return final;
+  }
+
+  async function handleDownload() {
     const canvas = canvasRef.current;
     if (!canvas) return;
     let { format, jpegQuality, resizeMode } = state.exportSettings;
-    // Instagram optimize overrides
     if (resizeMode === 'insta') {
       format = 'jpeg';
-      jpegQuality = 92;
+      jpegQuality = 95;
     }
     const mime = format === 'png' ? 'image/png' : 'image/jpeg';
     const quality = format === 'jpeg' ? jpegQuality / 100 : undefined;
@@ -2349,21 +2581,13 @@ function App() {
     let exportCanvas = canvas;
     if (resizeMode === 'width1080' || resizeMode === 'insta') {
       if (canvas.width > 1080) {
-        const scale = 1080 / canvas.width;
-        const newW = 1080;
-        const newH = Math.round(canvas.height * scale);
-        const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = newW;
-        tempCanvas.height = newH;
-        const tempCtx = tempCanvas.getContext('2d');
-        tempCtx.drawImage(canvas, 0, 0, newW, newH);
-        exportCanvas = tempCanvas;
+        exportCanvas = await buildExportCanvas(1080);
       }
     }
 
     const dataUrl = exportCanvas.toDataURL(mime, quality);
     const a = document.createElement('a');
-    const tabName = state.activeTab === 'overlay' ? 'exif_overlay' : 'before_after';
+    const tabName = state.activeTab === 'overlay' ? 'exif_overlay' : state.activeTab === 'beforeafter' ? 'before_after' : 'final_photo';
     // Use original unedited filename (without extension) as prefix
     let prefix = 'instagram';
     const srcFile = state.uneditedFile || state.editedFile;
@@ -2383,21 +2607,13 @@ function App() {
       let { format, jpegQuality, resizeMode } = state.exportSettings;
       if (resizeMode === 'insta') {
         format = 'jpeg';
-        jpegQuality = 92;
+        jpegQuality = 95;
       }
 
       let exportCanvas = canvas;
       if (resizeMode === 'width1080' || resizeMode === 'insta') {
         if (canvas.width > 1080) {
-          const scale = 1080 / canvas.width;
-          const newW = 1080;
-          const newH = Math.round(canvas.height * scale);
-          const tempCanvas = document.createElement('canvas');
-          tempCanvas.width = newW;
-          tempCanvas.height = newH;
-          const tempCtx = tempCanvas.getContext('2d');
-          tempCtx.drawImage(canvas, 0, 0, newW, newH);
-          exportCanvas = tempCanvas;
+          exportCanvas = await buildExportCanvas(1080);
         }
       }
 
@@ -2425,7 +2641,8 @@ function App() {
 
   const canShowTab = {
     overlay: hasImage,
-    beforeafter: hasBoth
+    beforeafter: hasBoth,
+    finalphoto: hasImage
   };
 
   const toggleTheme = () => setTheme(prev => prev === 'dark' ? 'light' : 'dark');
@@ -2435,7 +2652,11 @@ function App() {
     <LangContext.Provider value={lang}>
     <ThemeContext.Provider value={theme}>
     <div className="app-container">
-      <div className="sidebar">
+      <div className="sidebar" ref={sidebarRef}>
+        <div
+          className={`sidebar-resize-handle${isResizing ? ' active' : ''}`}
+          onMouseDown={handleResizeStart}
+        />
         {/* Header */}
         <div className="header">
           <div className="header-logo">📷</div>
@@ -2463,12 +2684,14 @@ function App() {
             <DropZone
               label={t('unedited')}
               thumb={state.uneditedThumb}
+              fileName={state.uneditedFile?.name}
               onFile={handleUneditedFile}
               onRemove={() => dispatch({ type: 'REMOVE_UNEDITED' })}
             />
             <DropZone
               label={t('edited')}
               thumb={state.editedThumb}
+              fileName={state.editedFile?.name}
               onFile={handleEditedFile}
               onRemove={() => dispatch({ type: 'REMOVE_EDITED' })}
             />
@@ -2497,6 +2720,11 @@ function App() {
             disabled={!canShowTab.beforeafter}
             onClick={() => dispatch({ type: 'SET_TAB', tab: 'beforeafter' })}>
             {t('beforeAfter')}
+          </button>
+          <button className={`tab-btn ${state.activeTab === 'finalphoto' ? 'active' : ''}`}
+            disabled={!canShowTab.finalphoto}
+            onClick={() => dispatch({ type: 'SET_TAB', tab: 'finalphoto' })}>
+            {t('finalPhoto')}
           </button>
         </div>
 
