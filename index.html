@@ -453,6 +453,7 @@ body {
   max-width: 100%;
   max-height: calc(100vh - 200px);
   object-fit: contain;
+  display: block;
 }
 
 .canvas-placeholder {
@@ -1793,6 +1794,8 @@ function PresetPanel({ state, dispatch }) {
 function CanvasPreview({ state, canvasRef }) {
   const rafRef = useRef(null);
   const timerRef = useRef(null);
+  const previewRef = useRef(null);
+  const wrapperRef = useRef(null);
   const t = useT();
 
   const render = useCallback(() => {
@@ -2231,7 +2234,61 @@ function CanvasPreview({ state, canvasRef }) {
     else if (activeTab === 'finalphoto') {
       ctx.drawImage(mainImg, crop.sx, crop.sy, crop.sw, crop.sh, frameSize, frameSize, crop.sw, crop.sh);
     }
+
+    // Update visible preview canvas with high-quality downscale
+    updatePreview(canvas);
   }, [state]);
+
+  const updatePreview = useCallback(async (srcCanvas) => {
+    const preview = previewRef.current;
+    const wrapper = wrapperRef.current;
+    if (!preview || !wrapper || !srcCanvas || !srcCanvas.width) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    const wrapperW = wrapper.clientWidth;
+    const wrapperMaxH = window.innerHeight - 200;
+
+    // Calculate display size that fits the wrapper while preserving aspect ratio
+    const aspect = srcCanvas.width / srcCanvas.height;
+    let dispW = wrapperW;
+    let dispH = dispW / aspect;
+    if (dispH > wrapperMaxH) {
+      dispH = wrapperMaxH;
+      dispW = dispH * aspect;
+    }
+
+    const pxW = Math.round(dispW * dpr);
+    const pxH = Math.round(dispH * dpr);
+
+    preview.style.width = Math.round(dispW) + 'px';
+    preview.style.height = Math.round(dispH) + 'px';
+
+    if (preview.width !== pxW || preview.height !== pxH) {
+      preview.width = pxW;
+      preview.height = pxH;
+    }
+
+    const pCtx = preview.getContext('2d', { alpha: false });
+
+    // Use createImageBitmap for Lanczos3 quality downscale
+    if (typeof createImageBitmap === 'function') {
+      try {
+        const bitmap = await createImageBitmap(srcCanvas, {
+          resizeWidth: pxW,
+          resizeHeight: pxH,
+          resizeQuality: 'high'
+        });
+        pCtx.drawImage(bitmap, 0, 0);
+        bitmap.close();
+        return;
+      } catch (e) {}
+    }
+
+    // Fallback
+    pCtx.imageSmoothingEnabled = true;
+    pCtx.imageSmoothingQuality = 'high';
+    pCtx.drawImage(srcCanvas, 0, 0, pxW, pxH);
+  }, []);
 
   useEffect(() => {
     clearTimeout(timerRef.current);
@@ -2259,8 +2316,9 @@ function CanvasPreview({ state, canvasRef }) {
   }
 
   return (
-    <div className="canvas-wrapper">
-      <canvas ref={canvasRef} />
+    <div className="canvas-wrapper" ref={wrapperRef}>
+      <canvas ref={canvasRef} style={{ display: 'none' }} />
+      <canvas ref={previewRef} />
     </div>
   );
 }
