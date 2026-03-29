@@ -98,6 +98,7 @@ body {
 
 .main-area {
   flex: 1;
+  min-width: 0;
   padding: 24px;
   overflow-y: auto;
   max-height: 100vh;
@@ -398,11 +399,12 @@ body {
   padding: 4px;
   border-radius: 12px;
   border: 1px solid var(--border);
+  min-width: 0;
 }
 
 .tab-btn {
   flex: 1;
-  padding: 10px 16px;
+  padding: 10px 12px;
   border-radius: 10px;
   border: none;
   background: transparent;
@@ -413,6 +415,9 @@ body {
   font-family: var(--font);
   transition: all 0.2s;
   white-space: nowrap;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .tab-btn.active {
