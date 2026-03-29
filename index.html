@@ -499,6 +499,99 @@ body {
 .download-btn:active { transform: scale(0.98); }
 .download-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
+/* Multi-download */
+.multi-download-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.multi-download-toggle {
+  background: var(--surface2) !important;
+  color: var(--text) !important;
+  border: 1px solid var(--border) !important;
+  font-size: 13px !important;
+}
+
+.multi-download-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.multi-dir-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.multi-dir-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text-muted);
+  transition: all 0.15s;
+  user-select: none;
+}
+
+.multi-dir-item:hover {
+  border-color: var(--accent1);
+  color: var(--text);
+}
+
+.multi-dir-item.selected {
+  border-color: var(--accent1);
+  background: rgba(249,115,22,0.1);
+  color: var(--text);
+}
+
+.multi-dir-item input[type="checkbox"] {
+  accent-color: var(--accent1);
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.multi-preview-row {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 4px 0;
+}
+
+.multi-preview-item {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.multi-preview-item img {
+  width: 120px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+
+.multi-preview-item span {
+  font-size: 9px;
+  color: var(--text-muted);
+  text-align: center;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* Notification */
 .notification {
   position: fixed;
@@ -811,7 +904,11 @@ const translations = {
     beforeAfter: 'Before / After',
     finalPhoto: 'Final Photo',
     download: 'İndir',
+    downloadMultiple: 'Çoklu İndir',
+    downloadAll: 'Tümünü İndir',
+    selectDirections: 'Yön seçin',
     photoDownloaded: 'Fotoğraf indirildi!',
+    photosDownloaded: 'fotoğraf indirildi!',
     uploadToStart: 'Başlamak için bir fotoğraf yükleyin',
     imageLoadError: 'Görsel yüklenemedi.',
     noExifInfo: 'EXIF bilgisi yok',
@@ -911,7 +1008,11 @@ const translations = {
     beforeAfter: 'Before / After',
     finalPhoto: 'Final Photo',
     download: 'Download',
+    downloadMultiple: 'Download Multiple',
+    downloadAll: 'Download All',
+    selectDirections: 'Select directions',
     photoDownloaded: 'Photo downloaded!',
+    photosDownloaded: 'photos downloaded!',
     uploadToStart: 'Upload a photo to get started',
     imageLoadError: 'Could not load image.',
     noExifInfo: 'No EXIF info',
@@ -2648,6 +2749,111 @@ function App() {
   const toggleTheme = () => setTheme(prev => prev === 'dark' ? 'light' : 'dark');
   const toggleLang = () => setLang(prev => prev === 'tr' ? 'en' : 'tr');
 
+  // ─── Multi-download (Before/After) ─────────────
+  const ALL_DIRECTIONS = [
+    { value: 'left-right', key: 'dirLR' },
+    { value: 'right-left', key: 'dirRL' },
+    { value: 'top-bottom', key: 'dirTB' },
+    { value: 'bottom-top', key: 'dirBT' },
+    { value: 'tl-br', key: 'dirTLBR' },
+    { value: 'tr-bl', key: 'dirTRBL' },
+    { value: 'bl-tr', key: 'dirBLTR' },
+    { value: 'br-tl', key: 'dirBRTL' },
+  ];
+  const [multiOpen, setMultiOpen] = useState(false);
+  const [multiDirs, setMultiDirs] = useState([]);
+  const [multiPreviews, setMultiPreviews] = useState([]);
+  const [multiDownloading, setMultiDownloading] = useState(false);
+
+  function toggleMultiDir(dir) {
+    setMultiDirs(prev => prev.includes(dir) ? prev.filter(d => d !== dir) : [...prev, dir]);
+  }
+
+  // Generate previews when multiDirs change
+  useEffect(() => {
+    if (!hasBoth || multiDirs.length === 0) {
+      setMultiPreviews([]);
+      return;
+    }
+
+    let cancelled = false;
+    async function generate() {
+      const previews = [];
+      const origDir = state.beforeAfter.direction;
+
+      for (const dir of multiDirs) {
+        // Temporarily set direction, render to hidden canvas, capture thumbnail
+        dispatch({ type: 'UPDATE_BEFORE_AFTER', data: { direction: dir } });
+        // Wait for render cycle (RAF + 50ms debounce in CanvasPreview)
+        await new Promise(r => setTimeout(r, 120));
+        const canvas = canvasRef.current;
+        if (canvas && canvas.width && !cancelled) {
+          try {
+            const thumbW = 200;
+            const thumbH = Math.round(canvas.height * (thumbW / canvas.width));
+            const bitmap = await createImageBitmap(canvas, { resizeWidth: thumbW, resizeHeight: thumbH, resizeQuality: 'high' });
+            const tc = document.createElement('canvas');
+            tc.width = thumbW; tc.height = thumbH;
+            tc.getContext('2d').drawImage(bitmap, 0, 0);
+            bitmap.close();
+            previews.push({ dir, dataUrl: tc.toDataURL('image/jpeg', 0.8) });
+          } catch {
+            previews.push({ dir, dataUrl: null });
+          }
+        }
+      }
+
+      // Restore original direction
+      dispatch({ type: 'UPDATE_BEFORE_AFTER', data: { direction: origDir } });
+
+      if (!cancelled) setMultiPreviews(previews);
+    }
+    generate();
+    return () => { cancelled = true; };
+  }, [multiDirs, hasBoth]);
+
+  async function handleMultiDownload() {
+    if (!hasBoth || multiDirs.length === 0) return;
+    setMultiDownloading(true);
+    const origDir = state.beforeAfter.direction;
+    let { format, jpegQuality, resizeMode } = state.exportSettings;
+    if (resizeMode === 'insta') { format = 'jpeg'; jpegQuality = 95; }
+    const mime = format === 'png' ? 'image/png' : 'image/jpeg';
+    const quality = format === 'jpeg' ? jpegQuality / 100 : undefined;
+
+    let prefix = 'instagram';
+    const srcFile = state.uneditedFile || state.editedFile;
+    if (srcFile && srcFile.name) prefix = srcFile.name.replace(/\.[^/.]+$/, '');
+
+    for (const dir of multiDirs) {
+      dispatch({ type: 'UPDATE_BEFORE_AFTER', data: { direction: dir } });
+      await new Promise(r => setTimeout(r, 150));
+
+      const canvas = canvasRef.current;
+      if (!canvas) continue;
+
+      let exportCanvas = canvas;
+      if (resizeMode === 'width1080' || resizeMode === 'insta') {
+        if (canvas.width > 1080) {
+          exportCanvas = await buildExportCanvas(1080);
+        }
+      }
+
+      const dataUrl = exportCanvas.toDataURL(mime, quality);
+      const a = document.createElement('a');
+      a.download = `${prefix}_before_after_${dir}.${format === 'png' ? 'png' : 'jpg'}`;
+      a.href = dataUrl;
+      a.click();
+
+      // Small delay between downloads so browser doesn't block them
+      await new Promise(r => setTimeout(r, 300));
+    }
+
+    dispatch({ type: 'UPDATE_BEFORE_AFTER', data: { direction: origDir } });
+    dispatch({ type: 'NOTIFY', message: `${multiDirs.length} ${t('photosDownloaded')}` });
+    setMultiDownloading(false);
+  }
+
   return (
     <LangContext.Provider value={lang}>
     <ThemeContext.Provider value={theme}>
@@ -2765,6 +2971,55 @@ function App() {
             📋
           </button>
         </div>
+
+        {/* Multi-download for Before/After */}
+        {state.activeTab === 'beforeafter' && hasBoth && (
+          <div className="multi-download-section">
+            <button
+              className="download-btn multi-download-toggle"
+              onClick={() => setMultiOpen(prev => !prev)}
+            >
+              {multiOpen ? '▲' : '▼'} {t('downloadMultiple')}
+            </button>
+
+            {multiOpen && (
+              <div className="multi-download-panel">
+                <div className="multi-dir-grid">
+                  {ALL_DIRECTIONS.map(d => (
+                    <label key={d.value} className={`multi-dir-item ${multiDirs.includes(d.value) ? 'selected' : ''}`}>
+                      <input
+                        type="checkbox"
+                        checked={multiDirs.includes(d.value)}
+                        onChange={() => toggleMultiDir(d.value)}
+                      />
+                      <span>{t(d.key)}</span>
+                    </label>
+                  ))}
+                </div>
+
+                {multiPreviews.length > 0 && (
+                  <div className="multi-preview-row">
+                    {multiPreviews.map(p => (
+                      <div key={p.dir} className="multi-preview-item">
+                        {p.dataUrl && <img src={p.dataUrl} alt={p.dir} />}
+                        <span>{t(ALL_DIRECTIONS.find(d => d.value === p.dir)?.key || '')}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <button
+                  className="download-btn"
+                  disabled={multiDirs.length === 0 || multiDownloading}
+                  onClick={handleMultiDownload}
+                  style={{ width: '100%' }}
+                >
+                  {multiDownloading ? '⏳' : '⬇'} {t('downloadAll')} {multiDirs.length > 0 ? `(${multiDirs.length})` : ''}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Notification */}
