@@ -185,6 +185,17 @@ body {
 .dropzone .icon { font-size: 28px; opacity: 0.5; }
 .dropzone .label { font-size: 12px; color: var(--text-muted); font-weight: 500; }
 .dropzone .sublabel { font-size: 10px; color: var(--text-muted); opacity: 0.6; }
+.dropzone-filename {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
+  padding: 4px 6px 0;
+  font-family: 'JetBrains Mono', monospace;
+}
 
 .dropzone .remove-btn {
   position: absolute;
@@ -1268,7 +1279,7 @@ function roundRect(ctx, x, y, w, h, r) {
 }
 
 // ─── DropZone ──────────────────────────────────────────────
-function DropZone({ label, thumb, onFile, onRemove }) {
+function DropZone({ label, thumb, onFile, onRemove, fileName }) {
   const [dragOver, setDragOver] = useState(false);
   const inputRef = useRef();
   const t = useT();
@@ -1307,6 +1318,7 @@ function DropZone({ label, thumb, onFile, onRemove }) {
           <div className="sublabel">{t('dragOrClick')}</div>
         </>
       )}
+      {fileName && <div className="dropzone-filename" title={fileName}>{fileName}</div>}
     </div>
   );
 }
@@ -2672,12 +2684,14 @@ function App() {
             <DropZone
               label={t('unedited')}
               thumb={state.uneditedThumb}
+              fileName={state.uneditedFile?.name}
               onFile={handleUneditedFile}
               onRemove={() => dispatch({ type: 'REMOVE_UNEDITED' })}
             />
             <DropZone
               label={t('edited')}
               thumb={state.editedThumb}
+              fileName={state.editedFile?.name}
               onFile={handleEditedFile}
               onRemove={() => dispatch({ type: 'REMOVE_EDITED' })}
             />
