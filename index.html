@@ -2381,7 +2381,7 @@ function App() {
       let src = canvas;
       if (resizeMode === 'width1080' || resizeMode === 'insta') {
         if (canvas.width > 1080) {
-          src = highQualityResize(canvas, 1080);
+          src = stepDownResize(canvas, 1080);
         }
       }
 
@@ -2393,13 +2393,12 @@ function App() {
     } catch { return null; }
   }
 
-  function highQualityResize(sourceCanvas, targetWidth) {
+  function stepDownResize(sourceCanvas, targetWidth) {
     let src = sourceCanvas;
     let curW = src.width;
     let curH = src.height;
     const targetH = Math.round(curH * (targetWidth / curW));
 
-    // Step-down: halve dimensions until close to target, then do final resize
     while (curW / 2 > targetWidth) {
       const halfW = Math.round(curW / 2);
       const halfH = Math.round(curH / 2);
@@ -2425,11 +2424,36 @@ function App() {
     return final;
   }
 
-  function handleDownload() {
+  async function highQualityResize(sourceCanvas, targetWidth) {
+    const targetH = Math.round(sourceCanvas.height * (targetWidth / sourceCanvas.width));
+
+    // Try createImageBitmap with Lanczos3 (Chromium) first
+    if (typeof createImageBitmap === 'function') {
+      try {
+        const bitmap = await createImageBitmap(sourceCanvas, {
+          resizeWidth: targetWidth,
+          resizeHeight: targetH,
+          resizeQuality: 'high'
+        });
+        const result = document.createElement('canvas');
+        result.width = targetWidth;
+        result.height = targetH;
+        const ctx = result.getContext('2d');
+        ctx.drawImage(bitmap, 0, 0);
+        bitmap.close();
+        return result;
+      } catch (e) {
+        // Fallback to step-down
+      }
+    }
+
+    return stepDownResize(sourceCanvas, targetWidth);
+  }
+
+  async function handleDownload() {
     const canvas = canvasRef.current;
     if (!canvas) return;
     let { format, jpegQuality, resizeMode } = state.exportSettings;
-    // Instagram optimize overrides
     if (resizeMode === 'insta') {
       format = 'jpeg';
       jpegQuality = 92;
@@ -2440,7 +2464,7 @@ function App() {
     let exportCanvas = canvas;
     if (resizeMode === 'width1080' || resizeMode === 'insta') {
       if (canvas.width > 1080) {
-        exportCanvas = highQualityResize(canvas, 1080);
+        exportCanvas = await highQualityResize(canvas, 1080);
       }
     }
 
@@ -2472,7 +2496,7 @@ function App() {
       let exportCanvas = canvas;
       if (resizeMode === 'width1080' || resizeMode === 'insta') {
         if (canvas.width > 1080) {
-          exportCanvas = highQualityResize(canvas, 1080);
+          exportCanvas = await highQualityResize(canvas, 1080);
         }
       }
 
