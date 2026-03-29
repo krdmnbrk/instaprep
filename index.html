@@ -66,7 +66,8 @@ body {
 
 .sidebar {
   width: 360px;
-  min-width: 360px;
+  min-width: 300px;
+  max-width: 600px;
   border-right: 1px solid var(--border);
   overflow-y: auto;
   max-height: 100vh;
@@ -74,6 +75,25 @@ body {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.sidebar-resize-handle {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 100;
+  background: transparent;
+  transition: background 0.15s;
+}
+
+.sidebar-resize-handle:hover,
+.sidebar-resize-handle.active {
+  background: var(--accent1);
 }
 
 .main-area {
@@ -282,6 +302,7 @@ body {
   color: var(--text-muted);
   white-space: nowrap;
   font-weight: 500;
+  flex-shrink: 0;
 }
 
 .control-row select,
@@ -302,7 +323,7 @@ body {
 
 .control-row input[type="range"] {
   flex: 1;
-  max-width: 140px;
+  min-width: 80px;
   accent-color: var(--accent1);
 }
 
@@ -320,8 +341,9 @@ body {
   font-size: 11px;
   font-family: 'JetBrains Mono', monospace;
   color: var(--text-muted);
-  min-width: 36px;
+  min-width: 44px;
   text-align: right;
+  flex-shrink: 0;
 }
 
 .checkbox-row {
@@ -615,9 +637,13 @@ body {
   .sidebar {
     width: 100%;
     min-width: unset;
+    max-width: unset;
     max-height: unset;
     border-right: none;
     border-bottom: 1px solid var(--border);
+  }
+  .sidebar-resize-handle {
+    display: none;
   }
   .main-area {
     max-height: unset;
@@ -2232,8 +2258,35 @@ function CanvasPreview({ state, canvasRef }) {
 function App() {
   const [state, dispatch] = useReducer(reducer, initialState);
   const canvasRef = useRef(null);
+  const sidebarRef = useRef(null);
   const [lang, setLang] = useState(() => localStorage.getItem('instaprep_lang') || 'tr');
   const [theme, setTheme] = useState(() => localStorage.getItem('instaprep_theme') || 'dark');
+  const [isResizing, setIsResizing] = useState(false);
+
+  const handleResizeStart = useCallback((e) => {
+    e.preventDefault();
+    setIsResizing(true);
+    const startX = e.clientX;
+    const startWidth = sidebarRef.current.offsetWidth;
+
+    const onMouseMove = (e) => {
+      const newWidth = Math.min(600, Math.max(300, startWidth + (e.clientX - startX)));
+      sidebarRef.current.style.width = newWidth + 'px';
+    };
+
+    const onMouseUp = () => {
+      setIsResizing(false);
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  }, []);
 
   // Apply theme to document
   useEffect(() => {
@@ -2435,7 +2488,11 @@ function App() {
     <LangContext.Provider value={lang}>
     <ThemeContext.Provider value={theme}>
     <div className="app-container">
-      <div className="sidebar">
+      <div className="sidebar" ref={sidebarRef}>
+        <div
+          className={`sidebar-resize-handle${isResizing ? ' active' : ''}`}
+          onMouseDown={handleResizeStart}
+        />
         {/* Header */}
         <div className="header">
           <div className="header-logo">📷</div>
