@@ -2374,14 +2374,22 @@ function App() {
     if (!canvas || !canvas.width) return null;
     try {
       let { format, jpegQuality, resizeMode } = state.exportSettings;
-      if (resizeMode === 'insta') { format = 'jpeg'; jpegQuality = 92; }
+      if (resizeMode === 'insta') { format = 'jpeg'; jpegQuality = 95; }
       const mime = format === 'png' ? 'image/png' : 'image/jpeg';
       const quality = format === 'jpeg' ? jpegQuality / 100 : undefined;
 
       let src = canvas;
       if (resizeMode === 'width1080' || resizeMode === 'insta') {
         if (canvas.width > 1080) {
-          src = stepDownResize(canvas, 1080);
+          const tW = 1080;
+          const tH = Math.round(canvas.height * (1080 / canvas.width));
+          const tmp = document.createElement('canvas');
+          tmp.width = tW; tmp.height = tH;
+          const tCtx = tmp.getContext('2d');
+          tCtx.imageSmoothingEnabled = true;
+          tCtx.imageSmoothingQuality = 'high';
+          tCtx.drawImage(canvas, 0, 0, tW, tH);
+          src = tmp;
         }
       }
 
@@ -2393,12 +2401,78 @@ function App() {
     } catch { return null; }
   }
 
-  function stepDownResize(sourceCanvas, targetWidth) {
-    let src = sourceCanvas;
+  async function buildExportCanvas(targetWidth) {
+    const canvas = canvasRef.current;
+    if (!canvas) return canvas;
+    if (!targetWidth || canvas.width <= targetWidth) return canvas;
+
+    const targetH = Math.round(canvas.height * (targetWidth / canvas.width));
+    const mainImg = state.editedImage || state.uneditedImage;
+    const { activeTab, frame, exportSettings } = state;
+    const crop = mainImg ? getCropRect(mainImg.naturalWidth, mainImg.naturalHeight, exportSettings.aspectRatio) : null;
+    const frameEnabled = frame && frame.enabled;
+    const frameSize = frameEnabled ? (frame.size || 60) : 0;
+    const scale = targetWidth / canvas.width;
+
+    // For tabs that only draw a single image (no compositing),
+    // build the export canvas directly from the source image
+    // to avoid the intermediate full-res canvas decode-encode cycle.
+    const isSimpleTab = activeTab === 'finalphoto' || (activeTab === 'overlay' && state.overlay.showOverlay === false);
+
+    if (isSimpleTab && mainImg && crop) {
+      const scaledFrame = Math.round(frameSize * scale);
+      const innerW = targetWidth - scaledFrame * 2;
+      const innerH = targetH - scaledFrame * 2;
+
+      // Use createImageBitmap to crop+resize the original image in one step (Lanczos3 in Chromium)
+      if (typeof createImageBitmap === 'function') {
+        try {
+          const bitmap = await createImageBitmap(mainImg, crop.sx, crop.sy, crop.sw, crop.sh, {
+            resizeWidth: innerW,
+            resizeHeight: innerH,
+            resizeQuality: 'high'
+          });
+          const result = document.createElement('canvas');
+          result.width = targetWidth;
+          result.height = targetH;
+          const ctx = result.getContext('2d', { alpha: false });
+          if (frameEnabled) {
+            ctx.fillStyle = frame.color || '#ffffff';
+            ctx.fillRect(0, 0, targetWidth, targetH);
+          }
+          ctx.drawImage(bitmap, scaledFrame, scaledFrame);
+          bitmap.close();
+          return result;
+        } catch (e) {
+          // fall through to canvas-based resize
+        }
+      }
+    }
+
+    // Fallback: resize via createImageBitmap on the canvas, or step-down
+    if (typeof createImageBitmap === 'function') {
+      try {
+        const bitmap = await createImageBitmap(canvas, {
+          resizeWidth: targetWidth,
+          resizeHeight: targetH,
+          resizeQuality: 'high'
+        });
+        const result = document.createElement('canvas');
+        result.width = targetWidth;
+        result.height = targetH;
+        const ctx = result.getContext('2d', { alpha: false });
+        ctx.drawImage(bitmap, 0, 0);
+        bitmap.close();
+        return result;
+      } catch (e) {
+        // fall through
+      }
+    }
+
+    // Step-down fallback
+    let src = canvas;
     let curW = src.width;
     let curH = src.height;
-    const targetH = Math.round(curH * (targetWidth / curW));
-
     while (curW / 2 > targetWidth) {
       const halfW = Math.round(curW / 2);
       const halfH = Math.round(curH / 2);
@@ -2413,7 +2487,6 @@ function App() {
       curW = halfW;
       curH = halfH;
     }
-
     const final = document.createElement('canvas');
     final.width = targetWidth;
     final.height = targetH;
@@ -2424,39 +2497,13 @@ function App() {
     return final;
   }
 
-  async function highQualityResize(sourceCanvas, targetWidth) {
-    const targetH = Math.round(sourceCanvas.height * (targetWidth / sourceCanvas.width));
-
-    // Try createImageBitmap with Lanczos3 (Chromium) first
-    if (typeof createImageBitmap === 'function') {
-      try {
-        const bitmap = await createImageBitmap(sourceCanvas, {
-          resizeWidth: targetWidth,
-          resizeHeight: targetH,
-          resizeQuality: 'high'
-        });
-        const result = document.createElement('canvas');
-        result.width = targetWidth;
-        result.height = targetH;
-        const ctx = result.getContext('2d');
-        ctx.drawImage(bitmap, 0, 0);
-        bitmap.close();
-        return result;
-      } catch (e) {
-        // Fallback to step-down
-      }
-    }
-
-    return stepDownResize(sourceCanvas, targetWidth);
-  }
-
   async function handleDownload() {
     const canvas = canvasRef.current;
     if (!canvas) return;
     let { format, jpegQuality, resizeMode } = state.exportSettings;
     if (resizeMode === 'insta') {
       format = 'jpeg';
-      jpegQuality = 92;
+      jpegQuality = 95;
     }
     const mime = format === 'png' ? 'image/png' : 'image/jpeg';
     const quality = format === 'jpeg' ? jpegQuality / 100 : undefined;
@@ -2464,7 +2511,7 @@ function App() {
     let exportCanvas = canvas;
     if (resizeMode === 'width1080' || resizeMode === 'insta') {
       if (canvas.width > 1080) {
-        exportCanvas = await highQualityResize(canvas, 1080);
+        exportCanvas = await buildExportCanvas(1080);
       }
     }
 
@@ -2490,13 +2537,13 @@ function App() {
       let { format, jpegQuality, resizeMode } = state.exportSettings;
       if (resizeMode === 'insta') {
         format = 'jpeg';
-        jpegQuality = 92;
+        jpegQuality = 95;
       }
 
       let exportCanvas = canvas;
       if (resizeMode === 'width1080' || resizeMode === 'insta') {
         if (canvas.width > 1080) {
-          exportCanvas = await highQualityResize(canvas, 1080);
+          exportCanvas = await buildExportCanvas(1080);
         }
       }
 
