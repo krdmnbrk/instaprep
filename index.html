@@ -2381,12 +2381,7 @@ function App() {
       let src = canvas;
       if (resizeMode === 'width1080' || resizeMode === 'insta') {
         if (canvas.width > 1080) {
-          const scale = 1080 / canvas.width;
-          const tmp = document.createElement('canvas');
-          tmp.width = 1080;
-          tmp.height = Math.round(canvas.height * scale);
-          tmp.getContext('2d').drawImage(canvas, 0, 0, tmp.width, tmp.height);
-          src = tmp;
+          src = highQualityResize(canvas, 1080);
         }
       }
 
@@ -2396,6 +2391,38 @@ function App() {
       if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
       return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
     } catch { return null; }
+  }
+
+  function highQualityResize(sourceCanvas, targetWidth) {
+    let src = sourceCanvas;
+    let curW = src.width;
+    let curH = src.height;
+    const targetH = Math.round(curH * (targetWidth / curW));
+
+    // Step-down: halve dimensions until close to target, then do final resize
+    while (curW / 2 > targetWidth) {
+      const halfW = Math.round(curW / 2);
+      const halfH = Math.round(curH / 2);
+      const step = document.createElement('canvas');
+      step.width = halfW;
+      step.height = halfH;
+      const sCtx = step.getContext('2d');
+      sCtx.imageSmoothingEnabled = true;
+      sCtx.imageSmoothingQuality = 'high';
+      sCtx.drawImage(src, 0, 0, halfW, halfH);
+      src = step;
+      curW = halfW;
+      curH = halfH;
+    }
+
+    const final = document.createElement('canvas');
+    final.width = targetWidth;
+    final.height = targetH;
+    const fCtx = final.getContext('2d');
+    fCtx.imageSmoothingEnabled = true;
+    fCtx.imageSmoothingQuality = 'high';
+    fCtx.drawImage(src, 0, 0, targetWidth, targetH);
+    return final;
   }
 
   function handleDownload() {
@@ -2413,15 +2440,7 @@ function App() {
     let exportCanvas = canvas;
     if (resizeMode === 'width1080' || resizeMode === 'insta') {
       if (canvas.width > 1080) {
-        const scale = 1080 / canvas.width;
-        const newW = 1080;
-        const newH = Math.round(canvas.height * scale);
-        const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = newW;
-        tempCanvas.height = newH;
-        const tempCtx = tempCanvas.getContext('2d');
-        tempCtx.drawImage(canvas, 0, 0, newW, newH);
-        exportCanvas = tempCanvas;
+        exportCanvas = highQualityResize(canvas, 1080);
       }
     }
 
@@ -2453,15 +2472,7 @@ function App() {
       let exportCanvas = canvas;
       if (resizeMode === 'width1080' || resizeMode === 'insta') {
         if (canvas.width > 1080) {
-          const scale = 1080 / canvas.width;
-          const newW = 1080;
-          const newH = Math.round(canvas.height * scale);
-          const tempCanvas = document.createElement('canvas');
-          tempCanvas.width = newW;
-          tempCanvas.height = newH;
-          const tempCtx = tempCanvas.getContext('2d');
-          tempCtx.drawImage(canvas, 0, 0, newW, newH);
-          exportCanvas = tempCanvas;
+          exportCanvas = highQualityResize(canvas, 1080);
         }
       }
 
